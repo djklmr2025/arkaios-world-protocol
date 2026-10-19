@@ -8,7 +8,7 @@ import urllib.error
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from ledger import (Node, MAX_BLOCK_BYTES, apply_tx, canonical, certify, genesis,
-                    hashed, initial_state, public, registration, sign_tx, size_guard)
+                    hashed, initial_state, public, registration, sign_tx, size_guard, agent_id)
 from network import LoopbackNetwork, call, demo
 
 
@@ -38,38 +38,38 @@ class LedgerTests(unittest.TestCase):
 
     def test_lineage_global_serial_and_child_order(self):
         self.registered()
-        self.commit([registration(self.config,self.seller,'test:2',1,self.child),
-                     registration(self.config,self.buyer,'test:1',1,Ed25519PrivateKey.generate()),
-                     registration(self.config,self.seller,'test:2',2,Ed25519PrivateKey.generate())])
+        self.commit([registration(self.config,self.seller,agent_id(self.config,2),1,self.child),
+                     registration(self.config,self.buyer,agent_id(self.config,1),1,Ed25519PrivateKey.generate()),
+                     registration(self.config,self.seller,agent_id(self.config,2),2,Ed25519PrivateKey.generate())])
         state,_,_ = self.nodes[0].state()
-        self.assertEqual(list(state['agents']), ['test:1','test:2','test:3','test:4','test:5'])
-        self.assertEqual(state['agents']['test:3']['parent'],'test:2')
-        self.assertEqual(state['agents']['test:5']['child_index'],2)
-        self.assertEqual(state['agents']['test:3']['generation'],1)
+        self.assertEqual(list(state['agents']), [agent_id(self.config,1),agent_id(self.config,2),agent_id(self.config,3),agent_id(self.config,4),agent_id(self.config,5)])
+        self.assertEqual(state['agents'][agent_id(self.config,3)]['parent'],agent_id(self.config,2))
+        self.assertEqual(state['agents'][agent_id(self.config,5)]['child_index'],2)
+        self.assertEqual(state['agents'][agent_id(self.config,3)]['generation'],1)
         self.assertEqual(state['issued_amr_test'],0)
 
     def test_redeem_transferred_token_and_backing(self):
         self.registered()
-        self.commit([sign_tx(self.config,self.registrar,'registrar',3,'test.fund',{'recipient':'test:1','amount':1000}),
-                     sign_tx(self.config,self.buyer,'test:1',1,'bridge.lock_mint',{'amount':600})])
-        self.commit([sign_tx(self.config,self.buyer,'test:1',2,'token.transfer',{'recipient':'test:2','amount':250}),
-                     sign_tx(self.config,self.seller,'test:2',1,'bridge.burn_redeem',{'amount':250})])
+        self.commit([sign_tx(self.config,self.registrar,'registrar',3,'test.fund',{'recipient':agent_id(self.config,1),'amount':1000}),
+                     sign_tx(self.config,self.buyer,agent_id(self.config,1),1,'bridge.lock_mint',{'amount':600})])
+        self.commit([sign_tx(self.config,self.buyer,agent_id(self.config,1),2,'token.transfer',{'recipient':agent_id(self.config,2),'amount':250}),
+                     sign_tx(self.config,self.seller,agent_id(self.config,2),1,'bridge.burn_redeem',{'amount':250})])
         state,_,_=self.nodes[0].state()
         self.assertEqual(state['locked_amr_test'],350)
         self.assertEqual(state['token_supply'],350)
-        self.assertEqual(state['agents']['test:2']['amr_test'],250)
+        self.assertEqual(state['agents'][agent_id(self.config,2)]['amr_test'],250)
 
     def test_unfunded_mint_and_double_spend_rejected(self):
         self.registered()
         for op in ('bridge.lock_mint','bridge.burn_redeem'):
             with self.assertRaises(ValueError):
-                self.nodes[0].propose([sign_tx(self.config,self.buyer,'test:1',1,op,{'amount':1})])
-        self.commit([sign_tx(self.config,self.registrar,'registrar',3,'test.fund',{'recipient':'test:1','amount':10}),
-                     sign_tx(self.config,self.buyer,'test:1',1,'bridge.lock_mint',{'amount':10})])
+                self.nodes[0].propose([sign_tx(self.config,self.buyer,agent_id(self.config,1),1,op,{'amount':1})])
+        self.commit([sign_tx(self.config,self.registrar,'registrar',3,'test.fund',{'recipient':agent_id(self.config,1),'amount':10}),
+                     sign_tx(self.config,self.buyer,agent_id(self.config,1),1,'bridge.lock_mint',{'amount':10})])
         with self.assertRaises(ValueError):
-            self.nodes[0].propose([sign_tx(self.config,self.buyer,'test:1',2,'token.transfer',{'recipient':'test:2','amount':7}),
-                                  sign_tx(self.config,self.buyer,'test:1',3,'token.transfer',{'recipient':'test:2','amount':7})])
-        self.assertEqual(self.nodes[0].state()[0]['agents']['test:1']['token'],10)
+            self.nodes[0].propose([sign_tx(self.config,self.buyer,agent_id(self.config,1),2,'token.transfer',{'recipient':agent_id(self.config,2),'amount':7}),
+                                  sign_tx(self.config,self.buyer,agent_id(self.config,1),3,'token.transfer',{'recipient':agent_id(self.config,2),'amount':7})])
+        self.assertEqual(self.nodes[0].state()[0]['agents'][agent_id(self.config,1)]['token'],10)
 
     def test_quorum_and_certificate_tampering(self):
         envelope = certify(self.nodes[0], self.nodes, [registration(self.config,self.registrar,'registrar',1,self.buyer)])
@@ -118,10 +118,15 @@ class LedgerTests(unittest.TestCase):
         size_guard(b' '*MAX_BLOCK_BYTES)
         with self.assertRaises(ValueError):size_guard(b' '*(MAX_BLOCK_BYTES+1))
 
+    def test_same_display_chain_name_has_distinct_genesis_namespace(self):
+        other=copy.deepcopy(self.config)
+        other['registrar_key']=public(Ed25519PrivateKey.generate())
+        self.assertNotEqual(agent_id(self.config,1),agent_id(other,1))
+
     def test_nonce_bool_unknown_fields_and_duplicate_key(self):
         self.registered()
         for amount in (True,-1,0,1.2):
-            tx=sign_tx(self.config,self.registrar,'registrar',3,'test.fund',{'recipient':'test:1','amount':amount})
+            tx=sign_tx(self.config,self.registrar,'registrar',3,'test.fund',{'recipient':agent_id(self.config,1),'amount':amount})
             with self.assertRaises(ValueError):self.nodes[0].propose([tx])
         with self.assertRaisesRegex(ValueError,'already registered'):
             self.nodes[0].propose([registration(self.config,self.registrar,'registrar',3,self.buyer)])
