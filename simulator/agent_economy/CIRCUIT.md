@@ -6,7 +6,7 @@ Identidad local Ed25519 -> contexto firmado persistente -> tarea y reserva -> re
 
 No llama a un LLM: ejecuta una tarea determinista del agente de renderizado. No compone una canción nueva: renderiza el fixture test2_fondo_al_frente.json del estudio. No hay ingresos externos ni aceptación de un comprador real; la demo firma aceptación con el cliente local de prueba.
 
-No se conectó a Moltbook, ELEMIA, Council, pasarela AMR, blockchain, exchanges ni FIAT/CBDC. Estas fronteras locales permiten validar el circuito antes de incorporar sus adaptadores autenticados; no se anuncian integraciones remotas inexistentes.
+El circuito de render/cobro sigue siendo local. Se añadió un adaptador ELEMIA de solo lectura y se verificaron por separado identidad autenticada y recall contra el servicio remoto; la consulta de prueba devolvió cero recuerdos. No está conectado automáticamente al render ni a Moltbook, Council, pasarela AMR, blockchain, exchanges o FIAT/CBDC.
 
 ## Dependencias y fuente
 
@@ -25,7 +25,7 @@ El commit del motor es una referencia técnica fijada, no garantía de auditorí
 
 ## Arranque Windows (PowerShell)
 
-Dentro de simulator/agent_economy en la rama feat/local-agent-service-circuit:
+Dentro de simulator/agent_economy en la rama main:
 
 ```powershell
 py -3 -m venv .venv-circuit
@@ -71,13 +71,13 @@ No se reutiliza saldo fiat ni se emiten activos comerciales. fund_test es solo u
 
 ## Evidencia obtenida
 
-- 13 tests pasaron con el motor fijado: ocho del circuito y cinco del ledger.
+- 18 tests pasaron con el motor fijado: ocho del circuito, cinco del ledger y cinco del adaptador ELEMIA.
 - WAV real: estéreo PCM 16 bit, 44100 Hz, 66150 frames (1.5 s), pico absoluto 11389/32768, no silencioso ni recortado.
 - SHA-256 WAV: 03c2b16d4b671ff21e50ecc31a5ff5ffdd968295b8a6cd18b9562642023b657c.
 - Primera ejecución: comprador 750, agente 250, retenido 0; total 1000.
 - Segunda ejecución desde el mismo estado: dos memorias recuperadas; mismos saldos y sin segundo pago.
 - Tests rechazan firma del vendedor como aceptación, archivo alterado, sustitución de clave, memoria alterada, cambio de pedido y rutas inválidas; cubren fallo del worker y caída tras liquidación.
-- Motor leído mediante GitHub, fijado al commit indicado y verificado contra los bytes exactos de las tres fuentes. No se validó interfaz Windows ni servicios remotos.
+- Motor leído mediante GitHub, fijado al commit indicado y verificado contra los bytes exactos de las tres fuentes. No se validó interfaz Windows. ELEMIA remoto se comprobó por separado como se detalla abajo.
 
 ## Siguiente integración
 
@@ -86,3 +86,16 @@ No se reutiliza saldo fiat ni se emiten activos comerciales. fund_test es solo u
 3. Publicar estados de tarea en Council sin ejecutar texto como código.
 4. Integrar cuenta AMR por propiedad autenticada, idempotencia y conciliación. Mantener unidades sintéticas separadas.
 5. Anclar compromisos al ledger de red solo después de definir consenso/finalidad. Este circuito no implementa bloques de 8 MB.
+
+## Adaptador ELEMIA de solo lectura
+
+Configurar ELEMIA_BASE_URL como origen HTTPS y ELEMIA_HTTP_TOKEN en el entorno del proceso (no en Git ni variables VITE). El CLI no importa los archivos de credenciales del usuario ni imprime sus valores.
+
+```powershell
+.\.venv-circuit\Scripts\python.exe elemia_client.py
+.\.venv-circuit\Scripts\python.exe elemia_client.py --query arkaios-world-protocol
+```
+
+Verifica Authorization Bearer, HTTP 200, ok=true y forma de la respuesta. identity exige nombre ELEMIA; recall solo devuelve datos y el CLI imprime el conteo. Bloquea redirecciones, limita respuesta a 256 KiB y timeout a 10 s por defecto. No guarda recuerdos ni hace pagos. No confundir cero resultados con fallo de conexión. No se asume aislamiento por agente: el servidor usa un contenedor de memoria compartido según el código revisado.
+
+Verificación real 2026-10-18: identidad HTTP 200 y consulta recall confirmada, cero resultados para arkaios-world-protocol. Primeros probes de salud agotaron timeout; la autenticación posterior funcionó. Por tanto no se declararon inválidas las credenciales a partir de esos timeouts. No se comprobaron claves de otros proveedores.
