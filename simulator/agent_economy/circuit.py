@@ -15,9 +15,9 @@ from economy import Economy
 
 MUSIC_COMMIT = '2803142d68ff21baa595f63b254eeeb89c4c1e20'
 SOURCE_HASHES = {
-    'engine/spatial_model.py': 'f34e4af58ce9d2b5c24ff6d0f083b9aec89711a6fddccc36487dec8e933ef592',
-    'engine/spatial_renderer.py': '9d916fab600799de85669ba00681469e562e81414c3df21e3ea3b65904bda782',
-    'projects/test2_fondo_al_frente.json': '250a2fdcf826a46dc33b6fb9d606795b21ff3e5408e011fa72c99ea79b385000',
+    'engine/spatial_model.py': 'c7a951d9fec4fce5df3c90b080d6590de239de86e0dd690a3e82d072cfd794ed',
+    'engine/spatial_renderer.py': '3107f914955ac3f47585671c001af9ebe830c449744273e37deb302a10292838',
+    'projects/test2_fondo_al_frente.json': 'ecb1905eae4ed5afbf81446e2a95ee9f07f02a2e8376e806be5a1db2b46e9761',
 }
 
 
