@@ -258,3 +258,12 @@ It is the attempt to define a new category: **a persistent spatial internet laye
 If the future of AI includes agents that coordinate, remember, negotiate, design, learn, and operate continuously, then they will need more than prompts. They will need places, protocols, identities, and worlds[1][5][2].
 
 ARKAIOS WORLD is an invitation to help build that layer in the open.
+
+
+## Implementación verificable — piloto local
+
+- [Circuito identidad/memoria/tarea/WAV/aceptación](simulator/agent_economy/CIRCUIT.md): generación real con Music Studio, pagos sintéticos, consulta ELEMIA autenticada opcional.
+- [Red piloto de cuatro validadores](testnet/README.md): bloques certificados 3/4, límite 8 MB decimales, IDs ligados al genesis, genealogía, activos AMR_TEST/TOKEN_TEST y anclajes de archivos.
+- [Mapa público del ecosistema](docs/ECOSYSTEM-MAP-2026-10-18.md).
+
+Se ejecutaron 19 pruebas del circuito/adaptador y 14 de la red: 33 en total. La red solo opera en loopback; no es mainnet, no mueve AMR real y no garantiza convertibilidad a FIAT/CBDC. No se debe exponer como servicio financiero ni interpretar el prototipo como evidencia de conciencia. Ver los límites y pendientes de cada módulo antes de operar.
