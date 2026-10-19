@@ -1,0 +1,4 @@
+.local-pilot/
+.venv-pilot/
+__pycache__/
+.music-source/
