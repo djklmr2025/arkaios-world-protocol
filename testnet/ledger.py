@@ -64,6 +64,13 @@ def initial_state():
             'issued_amr_test': 0, 'token_supply': 0, 'locked_amr_test': 0, 'artifacts': {}}
 
 
+def agent_id(config, serial):
+    if type(serial) is not int or serial < 1:
+        raise ValueError('positive identity serial required')
+    # A display chain name alone is not a namespace: bind identity to genesis.
+    return config['chain_id'] + ':' + hashed(config) + ':' + str(serial)
+
+
 def sign_tx(config, key, actor, nonce, operation, payload):
     message = {'domain': 'ark.test.tx.v1', 'genesis': hashed(config), 'actor': actor,
                'nonce': nonce, 'operation': operation, 'payload': payload}
@@ -105,7 +112,7 @@ def apply_tx(state, tx, config):
                  'nonce': m['nonce'], 'public_key': payload['public_key']}
         verify(payload['public_key'], canonical(proof), payload['child_proof'])
         serial = state['next_serial']
-        identity = config['chain_id'] + ':' + str(serial)
+        identity = agent_id(config, serial)
         parent = None if actor == 'registrar' else actor
         child_index = 0
         if parent:
