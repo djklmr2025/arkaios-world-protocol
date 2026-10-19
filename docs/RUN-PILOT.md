@@ -61,3 +61,7 @@ Validación local de esta entrega: 19 pruebas del circuito/adaptador, 14 del led
 ## Alcance
 
 Todo opera con unidades de prueba y HTTP en loopback. No usa credenciales, Moltbook, ELEMIA ni la pasarela AMR en esta ejecución. El puente real AMR, la vinculación de identidades remotas y el despliegue de validadores independientes siguen pendientes, según [el alcance de la red](../testnet/README.md). Las claves locales son de desarrollo, sin cifrar; guarda el directorio con permisos privados y no lo publiques.
+
+### Estado de CI de esta publicación
+
+[La primera ejecución](https://github.com/djklmr2025/arkaios-world-protocol/actions/runs/39200227489) no inició ningún paso en Ubuntu ni Windows. GitHub informó: `The job was not started because your account is locked due to a billing issue.` Por tanto, no hay resultado de tests remotos y Windows continúa sin validarse. Las 35 pruebas locales Linux indicadas arriba sí se ejecutaron. Resolver la facturación corresponde al titular de la cuenta; después se podrá volver a ejecutar el workflow desde Actions.
