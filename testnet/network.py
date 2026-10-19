@@ -10,7 +10,7 @@ import urllib.request
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from ledger import Node, MAX_BLOCK_BYTES, canonical, genesis, hashed, public, registration, sign_tx
+from ledger import Node, MAX_BLOCK_BYTES, canonical, genesis, hashed, public, registration, sign_tx, agent_id
 
 
 def key_at(root, name):
@@ -163,11 +163,11 @@ def demo(root, artifact=None):
                 stages = [
                     [registration(config, registrar, 'registrar', 1, buyer),
                      registration(config, registrar, 'registrar', 2, provider)],
-                    [registration(config, provider, 'arkaios-local-test:2', 1, child),
-                     sign_tx(config, registrar, 'registrar', 3, 'test.fund', {'recipient': 'arkaios-local-test:1', 'amount': 1000}),
-                     sign_tx(config, buyer, 'arkaios-local-test:1', 1, 'bridge.lock_mint', {'amount': 600})],
-                    [sign_tx(config, buyer, 'arkaios-local-test:1', 2, 'token.transfer', {'recipient': 'arkaios-local-test:2', 'amount': 250}),
-                     sign_tx(config, provider, 'arkaios-local-test:2', 2, 'bridge.burn_redeem', {'amount': 250})],
+                    [registration(config, provider, agent_id(config, 2), 1, child),
+                     sign_tx(config, registrar, 'registrar', 3, 'test.fund', {'recipient': agent_id(config, 1), 'amount': 1000}),
+                     sign_tx(config, buyer, agent_id(config, 1), 1, 'bridge.lock_mint', {'amount': 600})],
+                    [sign_tx(config, buyer, agent_id(config, 1), 2, 'token.transfer', {'recipient': agent_id(config, 2), 'amount': 250}),
+                     sign_tx(config, provider, agent_id(config, 2), 2, 'bridge.burn_redeem', {'amount': 250})],
                 ]
                 for transactions in stages:
                     network.finalize(coordinator.propose(transactions))
@@ -176,12 +176,12 @@ def demo(root, artifact=None):
             if artifact is not None:
                 artifact_hash = hashlib.sha256(Path(artifact).read_bytes()).hexdigest()
                 current, next_height, _ = coordinator.state()
-                reference = 'arkaios-local-test:2:render-001'
+                reference = agent_id(config, 2) + ':render-001'
                 if reference in current['artifacts']:
                     if current['artifacts'][reference]['sha256'] != artifact_hash:
                         raise ValueError('anchored artifact differs')
                 else:
-                    tx = sign_tx(config, provider, 'arkaios-local-test:2', current['nonces']['arkaios-local-test:2']+1,
+                    tx = sign_tx(config, provider, agent_id(config, 2), current['nonces'][agent_id(config, 2)]+1,
                                  'artifact.anchor', {'sha256': artifact_hash, 'task_ref': 'render-001'})
                     network.finalize(coordinator.propose([tx]))
             status = [call(port, '/status') for port in network.ports.values()]
