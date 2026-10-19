@@ -224,7 +224,7 @@ def inspect_wav(path):
     return {'channels': channels, 'sample_width': width, 'sample_rate': rate, 'frames': frames, 'peak_pcm': peak}
 
 
-def demo(root, music_root):
+def demo(root, music_root, remote_context=None):
     circuit = Circuit(root)
     buyer_key, seller_key = (load_or_create_key(root, name) for name in ('buyer', 'music-agent'))
     circuit.register('buyer', buyer_key)
@@ -233,6 +233,9 @@ def demo(root, music_root):
     if not previous_context:
         circuit.remember('music-agent', {'role': 'spatial-renderer', 'source': 'arkaios-music-studio',
                                        'objective': 'render supplied fixture, not compose a new song'}, seller_key)
+    if remote_context is not None:
+        # External memory remains data; it cannot change commands, payment or identity.
+        circuit.remember('music-agent', {'source': 'ELEMIA', 'read_only_context': remote_context}, seller_key)
     circuit.ledger.fund_test('demo-only-1000', 'buyer', 1000)
     circuit.request('render-001', 'buyer', 'music-agent', 250)
     delivery = circuit.render('render-001', music_root, seller_key)
@@ -241,6 +244,7 @@ def demo(root, music_root):
     audit = circuit.accept('render-001', signature)
     result = {'mode': 'LOCAL_SYNTHETIC_PAYMENT', 'task': circuit.task('render-001')['state'],
               'recovered_memories': len(previous_context), 'delivery': delivery,
+              'remote_context_items': len(remote_context) if remote_context is not None else None,
               'buyer_balance': circuit.ledger.balance('buyer'), 'agent_balance': circuit.ledger.balance('music-agent'),
               'audit': audit}
     (Path(root) / 'report.json').write_bytes(canonical(result))
@@ -252,5 +256,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--state', required=True)
     parser.add_argument('--music-root', required=True)
+    parser.add_argument('--elemia-query', help='Read ELEMIA before work; requires runtime token and fails closed')
     args = parser.parse_args()
-    print(json.dumps(demo(args.state, args.music_root), indent=2))
+    remote_context = None
+    if args.elemia_query:
+        from elemia_client import ElemiaClient, ConnectionFailure
+        try:
+            client = ElemiaClient.from_environment()
+            client.identity()
+            remote_context = client.recall(args.elemia_query)
+        except (ValueError, ConnectionFailure) as exc:
+            print(json.dumps({'remote_context_confirmed': False, 'error': str(exc)}))
+            raise SystemExit(1)
+    print(json.dumps(demo(args.state, args.music_root, remote_context), indent=2))
