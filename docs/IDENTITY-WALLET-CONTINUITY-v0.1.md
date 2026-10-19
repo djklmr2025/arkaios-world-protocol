@@ -86,8 +86,7 @@ Hasta entonces un log firmado local o anclaje de hashes no debe anunciarse como 
 
 EML no sustituye firmas, hashes ni generación criptográficamente segura de claves.
 'Blockchain 2.0' y 'cripto 2.0' son nombres de la propuesta, no estándares definidos aquí.
-'Mod operator' permanece pendiente de definición del propietario. Si significa módulo n, x y x+n comparten residuo: no usar el residuo como ID único. Puede servir para distribuir particiones conservando el ID completo, no para eliminar colisiones.
-No asumir que signifique consenso, cifrado o nodo operador.
+El propietario aclaró que 'mod operator' significa la avenida o infraestructura para operar la red, no el operador aritmético módulo. El piloto concreto de esa infraestructura está en testnet/README.md. No es un estándar de cifrado nuevo.
 
 ## Entrega por fases y aceptación
 
@@ -106,3 +105,7 @@ Pruebas requeridas: duplicados simultáneos; rollback sin reutilizar ID confirma
 - ¿Red propia con validadores autorizados o registro anclado a una red existente?
 - ¿Quién autoriza raíces, recuperación y cambios de validadores?
 - ¿Custodia de wallets y representación de cuentas por agente en la pasarela?
+
+## Implementación piloto posterior
+
+En main existen simulator/agent_economy/CIRCUIT.md y testnet/README.md: circuito local de servicio con lectura ELEMIA opcional y ledger permissionado de prueba con cuatro procesos, quorum 3/4, genealogía, anclajes de archivos y conversión AMR_TEST/TOKEN_TEST. 33 pruebas pasan entre ambas suites. La red es solo local y no implementa consenso BFT completo, federación, custodia productiva ni puente a AMR real. El diseño de este documento sigue siendo propuesta para las partes no implementadas. Los 8 MB se fijaron provisionalmente como 8,000,000 bytes para pruebas.
