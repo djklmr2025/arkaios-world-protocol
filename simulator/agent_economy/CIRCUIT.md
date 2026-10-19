@@ -6,7 +6,7 @@ Identidad local Ed25519 -> contexto firmado persistente -> tarea y reserva -> re
 
 No llama a un LLM: ejecuta una tarea determinista del agente de renderizado. No compone una canción nueva: renderiza el fixture test2_fondo_al_frente.json del estudio. No hay ingresos externos ni aceptación de un comprador real; la demo firma aceptación con el cliente local de prueba.
 
-El circuito de render/cobro sigue siendo local. Se añadió un adaptador ELEMIA de solo lectura y se verificaron por separado identidad autenticada y recall contra el servicio remoto; la consulta de prueba devolvió cero recuerdos. No está conectado automáticamente al render ni a Moltbook, Council, pasarela AMR, blockchain, exchanges o FIAT/CBDC.
+El render y cobro siguen siendo locales, con consulta ELEMIA remota opcional antes de trabajar mediante --elemia-query. Se verificó el circuito completo con identidad autenticada y recall real: cero recuerdos para la consulta de prueba, render WAV y liquidación sintética confirmados. No hay vínculos de identidad Moltbook, Council, pasarela AMR, blockchain, exchanges o FIAT/CBDC. El heartbeat público de Moltbook respondió HTTP 200; eso no acredita su emisión de identidades ni wallets.
 
 ## Dependencias y fuente
 
@@ -42,7 +42,7 @@ $env:MUSIC_STUDIO_ROOT = 'C:\ARKAIOS\music-circuit-source'
 .\.venv-circuit\Scripts\python.exe -m unittest -v
 ```
 
-En Linux usar python3 y .venv-circuit/bin/python. Sin MUSIC_STUDIO_ROOT los ocho tests del circuito se omiten explícitamente; no interpretar esa ejecución como validación del render.
+En Linux usar python3 y .venv-circuit/bin/python. Sin MUSIC_STUDIO_ROOT los nueve tests del circuito se omiten explícitamente; no interpretar esa ejecución como validación del render.
 
 ## Salidas locales
 
@@ -71,7 +71,7 @@ No se reutiliza saldo fiat ni se emiten activos comerciales. fund_test es solo u
 
 ## Evidencia obtenida
 
-- 18 tests pasaron con el motor fijado: ocho del circuito, cinco del ledger y cinco del adaptador ELEMIA.
+- 19 tests pasaron con el motor fijado: nueve del circuito, cinco del ledger y cinco del adaptador ELEMIA.
 - WAV real: estéreo PCM 16 bit, 44100 Hz, 66150 frames (1.5 s), pico absoluto 11389/32768, no silencioso ni recortado.
 - SHA-256 WAV: 03c2b16d4b671ff21e50ecc31a5ff5ffdd968295b8a6cd18b9562642023b657c.
 - Primera ejecución: comprador 750, agente 250, retenido 0; total 1000.
@@ -99,3 +99,13 @@ Configurar ELEMIA_BASE_URL como origen HTTPS y ELEMIA_HTTP_TOKEN en el entorno d
 Verifica Authorization Bearer, HTTP 200, ok=true y forma de la respuesta. identity exige nombre ELEMIA; recall solo devuelve datos y el CLI imprime el conteo. Bloquea redirecciones, limita respuesta a 256 KiB y timeout a 10 s por defecto. No guarda recuerdos ni hace pagos. No confundir cero resultados con fallo de conexión. No se asume aislamiento por agente: el servidor usa un contenedor de memoria compartido según el código revisado.
 
 Verificación real 2026-10-18: identidad HTTP 200 y consulta recall confirmada, cero resultados para arkaios-world-protocol. Primeros probes de salud agotaron timeout; la autenticación posterior funcionó. Por tanto no se declararon inválidas las credenciales a partir de esos timeouts. No se comprobaron claves de otros proveedores.
+
+## Circuito con recuperación remota opcional
+
+```powershell
+.\.venv-circuit\Scripts\python.exe circuit.py --state .local-state --music-root C:\ARKAIOS\music-circuit-source --elemia-query arkaios-world-protocol
+```
+
+Requiere las mismas variables de entorno ELEMIA. Primero autentica y recupera datos; si falla, termina con código 1 antes de crear tareas/reservas. Guarda los resultados como datos en memoria local firmada: no los ejecuta ni permite cambiar precio, identidad, comandos o aceptación. El reporte imprime el conteo, no el texto recuperado. Esa memoria puede contener datos privados: proteger .local-state.
+
+Ejecución real comprobada: task ACCEPTED, remote_context_items 0, comprador (750,0), agente (250,0). La consulta sin resultados es éxito técnico, no prueba de contenido útil recuperado. No se escribió memoria remota. Los tests de contexto simulado comprueban conservación como datos y precio inalterado.
