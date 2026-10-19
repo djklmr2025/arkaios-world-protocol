@@ -1,0 +1,9 @@
+.local-state/
+.venv/
+__pycache__/
+*.key
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+!.env.example
