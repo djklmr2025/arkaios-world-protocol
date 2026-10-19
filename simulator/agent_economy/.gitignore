@@ -4,3 +4,6 @@ __pycache__/
 *.key
 *.sqlite
 *.sqlite-*
+.env
+.env.*
+!.env.example
