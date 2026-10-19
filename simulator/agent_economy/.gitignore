@@ -1,0 +1,6 @@
+.local-state/
+.venv-circuit/
+__pycache__/
+*.key
+*.sqlite
+*.sqlite-*
