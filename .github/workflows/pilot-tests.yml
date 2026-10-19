@@ -1,0 +1,58 @@
+name: Local pilot verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Read exact Music Studio source bytes
+        shell: python
+        run: |
+          import hashlib
+          from pathlib import Path
+          import sys
+          import urllib.request
+          sys.path.insert(0, 'simulator/agent_economy')
+          from circuit import MUSIC_COMMIT, SOURCE_HASHES
+          for relative, expected in SOURCE_HASHES.items():
+              url = f'https://raw.githubusercontent.com/djklmr2025/arkaios-music-studio/{MUSIC_COMMIT}/{relative}'
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  raw = response.read(1_000_001)
+              if len(raw) > 1_000_000 or hashlib.sha256(raw).hexdigest() != expected:
+                  raise ValueError('Pinned source mismatch: ' + relative)
+              target = Path('.music-source') / relative
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(raw)
+      - name: Install pinned dependencies
+        run: python -m pip install -r simulator/agent_economy/requirements-circuit.txt
+      - name: Circuit, memory and adapter tests
+        env:
+          MUSIC_STUDIO_ROOT: ${{ github.workspace }}/.music-source
+        run: python -m unittest discover -s simulator/agent_economy -v
+      - name: Ledger and four-process network tests
+        run: python -m unittest discover -s testnet -v
+      - name: Integrated restart and tampering regression
+        env:
+          MUSIC_STUDIO_ROOT: ${{ github.workspace }}/.music-source
+        run: python -m unittest -v test_pilot
+
+# No secrets, external authenticated services, financial endpoints or state uploads.
