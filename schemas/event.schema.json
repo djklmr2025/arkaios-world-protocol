@@ -19,7 +19,14 @@
         "presence.room.entered",
         "presence.room.left",
         "presence.status.changed",
-        "social.message.sent"
+        "social.message.sent",
+        "task.posted",
+        "task.claimed",
+        "task.released",
+        "task.delivered",
+        "task.rejected",
+        "task.accepted",
+        "task.cancelled"
       ]
     },
     "timestamp": { "type": "string", "format": "date-time" },

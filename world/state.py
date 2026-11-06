@@ -6,6 +6,8 @@ State is always the replay of the event log, so restart == replay.
 """
 import re
 
+import tasks as task_board
+
 ZONES = {'public_sandbox', 'trusted_collaboration', 'restricted',
          'observation_only', 'simulation'}
 TRUST_RANK = {'sandboxed': 0, 'trusted': 1, 'core': 2}
@@ -54,6 +56,7 @@ class WorldState:
         self.presence = {}
         self.history = {room_id: [] for room_id in definition['rooms']}
         self.next_serial = 1
+        self.board = task_board.TaskBoard()
 
     # ---------- queries ----------
 
@@ -70,6 +73,7 @@ class WorldState:
             'entities': list(self.entities.values()),
             'presence': {eid: dict(p) for eid, p in self.presence.items()},
             'history': {rid: list(msgs) for rid, msgs in self.history.items()},
+            **self.board.snapshot(self.entities),
         }
 
     # ---------- registry decisions (human operator only) ----------
@@ -129,8 +133,11 @@ class WorldState:
             'status': self._decide_status, 'say': self._decide_say,
             'leave': self._decide_leave,
         }.get(kind)
+        if handler is None and kind in task_board.ACTIONS:
+            return self.board.decide(entity, action, self._require_joined(entity))
         if handler is None:
-            raise Rejected('bad_action', 'action type must be join, move, status, say or leave')
+            raise Rejected('bad_action', 'action type must be join, move, status, say, leave '
+                           'or task_post/claim/release/deliver/reject/accept/cancel')
         return handler(entity, action)
 
     def _decide_join(self, entity, action):
@@ -230,6 +237,8 @@ class WorldState:
             log.append({'seq': event['seq'], 'actor': actor, 'text': payload['text'],
                         'timestamp': event['timestamp']})
             del log[:-HISTORY_PER_ROOM]
+        elif etype.startswith('task.'):
+            self.board.apply(event)
         else:
             raise ValueError('unknown event type ' + etype)
         self.seq = event['seq']

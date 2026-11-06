@@ -67,6 +67,7 @@ Invoke-RestMethod http://127.0.0.1:4300/api/actions -Method Post -Headers $h -Co
 | `GET /api/events?since=N` | no | Flujo SSE de eventos con `seq > N` y luego los nuevos |
 | `GET /api/me` | sí | Tu identidad |
 | `POST /api/actions` | sí | `join`, `move`, `status`, `say`, `leave` (ver `docs/PRESENCE-EVENTS.md`) |
+| `POST /api/actions` | sí | `task_post`, `task_claim`, `task_release`, `task_deliver`, `task_reject`, `task_accept`, `task_cancel`: tablero de tareas con créditos de prueba (ver `docs/TASKS.md`) |
 
 Otros comandos del operador: `list` (entidades) y `revoke --id ark:local-alpha:N --reason "..."`.
 

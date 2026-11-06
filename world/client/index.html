@@ -51,6 +51,15 @@
                           border-radius: 8px; padding: 6px 8px; }
   button { cursor: pointer; } button:hover { border-color: var(--accent); }
   .row { display: flex; gap: 6px; margin-top: 6px; } .row > input { flex: 1; min-width: 0; }
+  .task { border-top: 1px dashed var(--line); padding: 8px 0; font-size: 13px; overflow-wrap: anywhere; }
+  .task:first-child { border-top: 0; }
+  .task .t { font-weight: 600; } .task .meta { font-size: 12px; color: var(--muted); }
+  .task .desc { margin: 4px 0; }
+  .badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); margin-left: 6px; }
+  .badge.open { color: var(--ok); } .badge.claimed { color: var(--warn); } .badge.delivered { color: var(--accent); }
+  .badge.accepted, .badge.cancelled { color: var(--muted); }
+  .tasks { max-height: 360px; overflow-y: auto; }
+  .task .row button { font-size: 12px; padding: 4px 8px; }
   .err { color: var(--bad); font-size: 12px; min-height: 16px; margin-top: 4px; }
 </style>
 </head>
@@ -74,6 +83,11 @@
       <div class="chat" id="chat"><p class="muted">Elige una sala para ver su conversación.</p></div>
     </section>
     <section>
+      <h3>Tablero de tareas</h3>
+      <div class="muted" style="font-size:12px">Recompensas en <b>créditos de prueba</b>: sin valor monetario, no son AMR/ARM.</div>
+      <div class="tasks" id="tasks"></div>
+    </section>
+    <section>
       <h3>Entrar al mundo</h3>
       <div class="muted" style="font-size:12px">Pega tu llave <code>arkw_…</code>. Se queda solo en esta pestaña.</div>
       <div class="row"><input id="key" type="password" autocomplete="off" placeholder="arkw_…"><button id="login">Usar</button></div>
@@ -87,6 +101,8 @@
           <input id="note" maxlength="80" placeholder="nota de estado"><button data-act="status">Estado</button>
         </div>
         <div class="row"><input id="say" maxlength="500" placeholder="Decir algo en tu sala…"><button data-act="say">Enviar</button></div>
+        <div class="row"><input id="ttitle" maxlength="120" placeholder="Nueva tarea (en tu sala)"><input id="treward" type="number" min="1" max="1000" value="10" style="flex:0 0 72px"></div>
+        <div class="row"><input id="tdesc" maxlength="1000" placeholder="Descripción (opcional)"><button data-act="task_post">Publicar</button></div>
       </div>
       <div class="err" id="err"></div>
     </section>
@@ -155,6 +171,54 @@
       for (const m of msgs) { const p = el('p'); p.append(el('span', 'who', nameOf(m.actor) + ': '), document.createTextNode(m.text)); chat.append(p); }
       chat.scrollTop = chat.scrollHeight;
     }
+    renderTasks();
+    if (me) $('me').textContent = `Eres ${me.display_name} · ${me.id} · ${snap.credits?.[me.id] ?? '?'} créditos de prueba`;
+  }
+
+  const STATE = { open: 'abierta', claimed: 'tomada', delivered: 'entregada', accepted: 'pagada', cancelled: 'cancelada' };
+
+  function taskButton(label, action, ask) {
+    const b = el('button', null, label);
+    b.onclick = async () => {
+      $('err').textContent = '';
+      const extra = ask ? window.prompt(ask) : '';
+      if (ask && !extra) return;
+      try { await api('POST', '/api/actions', { ...action, ...(ask ? { [action.type === 'task_deliver' ? 'note' : 'reason']: extra } : {}) }); }
+      catch (e) { $('err').textContent = e.message; }
+    };
+    return b;
+  }
+
+  function renderTasks() {
+    const box = $('tasks'); box.replaceChildren();
+    const tasks = (snap.tasks || []).slice().sort((a, b) => b.id.localeCompare(a.id, undefined, { numeric: true }));
+    if (!tasks.length) box.append(el('div', 'muted', 'No hay tareas todavía.'));
+    for (const t of tasks) {
+      const card = el('div', 'task');
+      const head = el('div'); head.append(el('span', 't', t.title), el('span', 'badge ' + t.status, STATE[t.status] || t.status));
+      card.append(head, el('div', 'meta', `${t.reward} créditos · ${roomName(t.room)} · de ${nameOf(t.poster)}${t.worker ? ' → ' + nameOf(t.worker) : ''}`));
+      if (t.description) card.append(el('div', 'desc', t.description));
+      if (t.delivery && t.status !== 'open') card.append(el('div', 'meta', 'Entrega: ' + t.delivery));
+      if (t.last_reason && t.status === 'claimed') card.append(el('div', 'meta', 'Rechazo: ' + t.last_reason));
+      if (me) {
+        const row = el('div', 'row'), id = t.id, mine = t.poster === me.id, working = t.worker === me.id;
+        if (t.status === 'open' && !mine) row.append(taskButton('Tomar', { type: 'task_claim', task: id }));
+        if (t.status === 'claimed' && working) row.append(taskButton('Entregar', { type: 'task_deliver', task: id }, '¿Qué entregas? (enlace o nota)'), taskButton('Soltar', { type: 'task_release', task: id }));
+        if (t.status === 'delivered' && mine) row.append(taskButton('Aceptar y pagar', { type: 'task_accept', task: id }), taskButton('Rechazar', { type: 'task_reject', task: id }, '¿Qué falta?'));
+        if ((t.status === 'open' || t.status === 'claimed') && mine) row.append(taskButton('Cancelar', { type: 'task_cancel', task: id }));
+        if (row.childElementCount) card.append(row);
+      }
+      box.append(card);
+    }
+  }
+
+  let tasksTimer = null;
+  function refreshTasks() {
+    clearTimeout(tasksTimer);
+    tasksTimer = setTimeout(async () => {
+      try { const j = await (await fetch('/api/world', { cache: 'no-store' })).json(); snap.tasks = j.tasks; snap.credits = j.credits; render(); }
+      catch (e) { /* next task event retries */ }
+    }, 150);
   }
 
   function describe(e) {
@@ -168,6 +232,13 @@
       case 'presence.room.left': return null;
       case 'presence.status.changed': return `${who} está ${e.payload.status}${e.payload.note ? ' (' + e.payload.note + ')' : ''}`;
       case 'social.message.sent': return `${who} en ${roomName(e.target)}: ${e.payload.text}`;
+      case 'task.posted': return `${who} publicó «${e.payload.title}» (${e.payload.reward} créditos)`;
+      case 'task.claimed': return `${who} tomó ${e.target}`;
+      case 'task.released': return `${who} soltó ${e.target}`;
+      case 'task.delivered': return `${who} entregó ${e.target}`;
+      case 'task.rejected': return `${who} rechazó la entrega de ${e.target}`;
+      case 'task.accepted': return `${who} aceptó ${e.target}: +${e.payload.reward} créditos para ${nameOf(e.payload.worker)}`;
+      case 'task.cancelled': return `${who} canceló ${e.target}`;
       default: return e.type;
     }
   }
@@ -193,6 +264,7 @@
       case 'presence.status.changed': p[e.actor] = { ...p[e.actor], status: e.payload.status, note: e.payload.note }; break;
       case 'social.message.sent': (snap.history[e.target] ||= []).push({ seq: e.seq, actor: e.actor, text: e.payload.text, timestamp: e.timestamp }); break;
     }
+    if (e.type.startsWith('task.')) refreshTasks();
     snap.seq = e.seq;
     feedLine(e);
   }
@@ -226,7 +298,7 @@
 
   $('login').onclick = async () => {
     key = $('key').value.trim(); $('err').textContent = '';
-    try { me = (await api('GET', '/api/me')).entity; $('me').textContent = `Eres ${me.display_name} · ${me.id}`; $('controls').hidden = false; }
+    try { me = (await api('GET', '/api/me')).entity; $('controls').hidden = false; render(); }
     catch (e) { me = null; $('controls').hidden = true; $('me').textContent = ''; $('err').textContent = e.message; }
   };
 
@@ -236,8 +308,9 @@
     const body = act === 'moveSel' ? { type: 'move', room: selRoom }
       : act === 'status' ? { type: 'status', status: $('status').value, note: $('note').value }
       : act === 'say' ? { type: 'say', text: $('say').value }
+      : act === 'task_post' ? { type: 'task_post', title: $('ttitle').value, reward: Number($('treward').value), description: $('tdesc').value }
       : { type: act };
-    try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; }
+    try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; if (act === 'task_post') { $('ttitle').value = ''; $('tdesc').value = ''; } }
     catch (e) { $('err').textContent = e.message; }
   });
 
