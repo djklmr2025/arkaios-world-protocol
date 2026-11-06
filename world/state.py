@@ -14,6 +14,9 @@ ZONES = {'public_sandbox', 'trusted_collaboration', 'restricted',
          'observation_only', 'simulation'}
 TRUST_RANK = {'sandboxed': 0, 'trusted': 1, 'core': 2}
 STATUSES = {'online', 'busy', 'away'}
+MOODS = ('working', 'thinking', 'idea', 'happy', 'love', 'coffee', 'music', 'reading',
+         'sleeping', 'celebrating', 'confused', 'error')
+EMOTES = ('heart', 'laugh', 'thumbs_up', 'party', 'wave', 'wow', 'sad', 'angry')
 ENTITY_TYPES = {'agent', 'human'}
 MAX_TEXT = 500
 MAX_NOTE = 80
@@ -142,7 +145,7 @@ class WorldState:
         handler = {
             'join': self._decide_join, 'move': self._decide_move,
             'status': self._decide_status, 'say': self._decide_say,
-            'leave': self._decide_leave,
+            'leave': self._decide_leave, 'emote': self._decide_emote,
         }.get(kind)
         if handler is None and kind in task_board.ACTIONS:
             return self.board.decide(entity, action, self._require_joined(entity))
@@ -154,7 +157,7 @@ class WorldState:
             return self._decide_home(entity, action)
         if handler is None:
             raise Rejected('bad_action', 'action type must be join, move, status, say, leave, '
-                           'dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
+                           'emote, dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
                            'place or remove')
         return handler(entity, action)
 
@@ -182,8 +185,18 @@ class WorldState:
         if status not in STATUSES:
             raise Rejected('bad_status', 'status must be online, busy or away')
         note = str(action.get('note', '')).strip()[:MAX_NOTE]
+        mood = action.get('mood') or ''
+        if mood and mood not in MOODS:
+            raise Rejected('bad_mood', 'mood must be one of: ' + ', '.join(MOODS))
         return [('presence.status.changed', entity['id'], entity['id'],
-                 {'status': status, 'note': note})]
+                 {'status': status, 'note': note, 'mood': mood})]
+
+    def _decide_emote(self, entity, action):
+        current = self._require_joined(entity)
+        emote = action.get('emote')
+        if emote not in EMOTES:
+            raise Rejected('bad_emote', 'emote must be one of: ' + ', '.join(EMOTES))
+        return [('social.emote.sent', entity['id'], current, {'emote': emote})]
 
     def _decide_say(self, entity, action):
         current = self._require_joined(entity)
@@ -258,7 +271,7 @@ class WorldState:
         elif etype == 'identity.revoked':
             self.entities[target] = {**self.entities[target], 'status': 'revoked'}
         elif etype == 'presence.world.joined':
-            self.presence[actor] = {'room': None, 'status': 'online', 'note': '',
+            self.presence[actor] = {'room': None, 'status': 'online', 'note': '', 'mood': '',
                                     'since': event['timestamp']}
         elif etype == 'presence.room.entered':
             self.presence[actor] = {**self.presence[actor], 'room': target,
@@ -269,7 +282,9 @@ class WorldState:
             self.presence.pop(actor, None)
         elif etype == 'presence.status.changed':
             self.presence[actor] = {**self.presence[actor], 'status': payload['status'],
-                                    'note': payload['note']}
+                                    'note': payload['note'], 'mood': payload.get('mood', '')}
+        elif etype == 'social.emote.sent':
+            pass  # transient: shown live by clients, no lasting state
         elif etype == 'social.message.sent':
             log = self.history[target]
             log.append({'seq': event['seq'], 'actor': actor, 'text': payload['text'],

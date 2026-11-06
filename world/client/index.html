@@ -63,12 +63,34 @@
   .zone.home { color: #c084fc; }
   .av.sprite { background-color: #1e2a47; background-size: 400% 400%; background-position: 0 100%;
                image-rendering: pixelated; border-radius: 9px; color: transparent; }
-  .grid { position: relative; }
+  .grid { position: relative; overflow: visible; }
   .citizen { position: absolute; width: calc(100% / 16 * 1.6); aspect-ratio: 1; transform: translate(-19%, -45%);
              background-size: 400% 400%; image-rendering: pixelated; pointer-events: none; z-index: 3;
              animation: frames var(--speed, .9s) steps(var(--steps, 4)) infinite; }
   .citizen .tag { position: absolute; left: 50%; bottom: -14%; transform: translateX(-50%); white-space: nowrap;
                   font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 6px; background: rgba(11,16,32,.85); color: #fff; }
+  .av { overflow: visible; }
+  .av .mood { position: absolute; right: -8px; top: -10px; font-size: 14px; line-height: 1;
+              filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
+  .think { position: absolute; left: 50%; bottom: 92%; transform: translateX(-50%); background: #fff; color: #1b2235;
+           border-radius: 14px; padding: 2px 7px; font-size: 11px; font-weight: 600; white-space: nowrap; max-width: 220px;
+           overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  .think::before, .think::after { content: ''; position: absolute; background: #fff; border-radius: 50%; }
+  .think::before { width: 7px; height: 7px; left: 42%; bottom: -6px; }
+  .think::after { width: 4px; height: 4px; left: 36%; bottom: -11px; }
+  .say { position: absolute; left: 50%; bottom: 128%; transform: translateX(-50%); background: #fef9c3; color: #1b2235;
+         border: 2px solid #1b2235; border-radius: 10px; padding: 3px 8px; font-size: 11px; font-weight: 600;
+         width: max-content; max-width: 200px; white-space: normal; text-align: center; z-index: 5;
+         animation: popin .2s ease-out; }
+  .say::after { content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+                border: 6px solid transparent; border-top-color: #1b2235; }
+  .pop { position: absolute; left: 50%; bottom: 100%; font-size: 22px; transform: translateX(-50%);
+         animation: floatup 2.6s ease-out forwards; pointer-events: none; z-index: 6; }
+  .av .pop { font-size: 18px; }
+  @keyframes popin { from { transform: translateX(-50%) scale(.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+  @keyframes floatup { 0% { transform: translate(-50%, 6px) scale(.6); opacity: 0; } 15% { transform: translate(-50%, 0) scale(1.15); opacity: 1; }
+                       80% { opacity: 1; } 100% { transform: translate(-50%, -26px) scale(1); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .pop, .say { animation: none; } }
   @keyframes frames { from { background-position-x: 0%; } to { background-position-x: var(--end, 133.333%); } }
   @media (prefers-reduced-motion: reduce) { .citizen { animation: none; } }
   .home-view { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
@@ -142,8 +164,10 @@
         </div>
         <div class="row">
           <select id="status"><option>online</option><option>busy</option><option>away</option></select>
-          <input id="note" maxlength="80" placeholder="nota de estado"><button data-act="status">Estado</button>
+          <select id="mood" title="Ánimo (nube de pensamiento)"></select>
+          <input id="note" maxlength="80" placeholder="pensamiento / nota"><button data-act="status">Estado</button>
         </div>
+        <div class="row" id="emotes"></div>
         <div class="row"><input id="say" maxlength="500" placeholder="Decir algo en tu sala…"><button data-act="say">Enviar</button></div>
         <div class="row"><input id="ttitle" maxlength="120" placeholder="Nueva tarea (en tu sala)"><input id="treward" type="number" min="1" max="1000" value="10" style="flex:0 0 72px"></div>
         <div class="row"><input id="tdesc" maxlength="1000" placeholder="Descripción (opcional)"><button data-act="task_post">Publicar</button></div>
@@ -183,6 +207,20 @@
   const OBJECTS = ['desk', 'chair', 'computer', 'sofa', 'beanbag', 'table', 'lamp', 'plant', 'bookshelf', 'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note'];
   let tool = 'wood';
 
+  const MOOD = { working: '💻', thinking: '🤔', idea: '💡', happy: '😊', love: '🥰', coffee: '☕', music: '🎵',
+                 reading: '📖', sleeping: '💤', celebrating: '🎉', confused: '❓', error: '❗' };
+  const MOOD_ES = { working: 'trabajando', thinking: 'pensando', idea: 'idea', happy: 'contento', love: 'encantado',
+                    coffee: 'café', music: 'música', reading: 'leyendo', sleeping: 'durmiendo', celebrating: 'celebrando',
+                    confused: 'confundido', error: 'problema' };
+  const EMOTE = { heart: '❤️', laugh: '😂', thumbs_up: '👍', party: '🎉', wave: '👋', wow: '😮', sad: '😢', angry: '😠' };
+  const SAY_MS = 7000, EMOTE_MS = 2600;
+  const live = {};  // transient bubbles per entity: { say: {text, until}, emote: {emote, until} }
+  const moodIcon = (p) => MOOD[p.mood] || (p.status === 'busy' ? '💻' : p.status === 'away' ? '💤' : '');
+  function flash(id, kind, value, ms) {
+    live[id] = { ...live[id], [kind]: { ...value, until: Date.now() + ms } };
+    setTimeout(render, ms + 50);
+  }
+  const active = (id, kind) => { const b = live[id]?.[kind]; return b && b.until > Date.now() ? b : null; };
   const CHARACTERS = ['dexter', 'nova', 'morty', 'rio'];
   // nova is the only female sheet; chosen per identity, others fall back by serial.
   const CHARACTER_BY_ALIAS = { elemia: 'nova', claude: 'morty', operador: 'dexter', codex: 'rio' };
@@ -202,6 +240,10 @@
     a.style.backgroundImage = `url(/assets/${character(id)}_actions.png)`;
     a.title = `${e.display_name} (${e.type}, ${e.trust_level || '?'})${p.note ? ' — ' + p.note : ''}`;
     a.append(el('span', 'st ' + (p.status || 'online')));
+    const icon = moodIcon(p);
+    if (icon) a.append(el('span', 'mood', icon));
+    const pop = active(id, 'emote');
+    if (pop) a.append(el('span', 'pop', EMOTE[pop.emote]));
     return a;
   }
 
@@ -340,6 +382,10 @@
       c.style.setProperty('--end', `${pose.steps * 100 / 3}%`);
       c.style.setProperty('--speed', pose.speed);
       c.append(el('span', 'tag', nameOf(id)));
+      const p = snap.presence[id], icon = moodIcon(p), said = active(id, 'say'), pop = active(id, 'emote');
+      if (said) c.append(el('div', 'say', said.text.length > 90 ? said.text.slice(0, 88) + '…' : said.text));
+      else if (icon || p.note) c.append(el('div', 'think', `${icon} ${p.note || MOOD_ES[p.mood] || ''}`.trim()));
+      if (pop) c.append(el('span', 'pop', EMOTE[pop.emote]));
       c.title = `${nameOf(id)} · ${status}${snap.presence[id].note ? ' — ' + snap.presence[id].note : ''}`;
       grid.append(c);
     }
@@ -406,7 +452,8 @@
       case 'presence.world.left': return `${who} salió del mundo`;
       case 'presence.room.entered': return `${who} → ${roomName(e.target)}`;
       case 'presence.room.left': return null;
-      case 'presence.status.changed': return `${who} está ${e.payload.status}${e.payload.note ? ' (' + e.payload.note + ')' : ''}`;
+      case 'presence.status.changed': return `${who} está ${e.payload.status}${e.payload.mood ? ' ' + MOOD[e.payload.mood] : ''}${e.payload.note ? ' (' + e.payload.note + ')' : ''}`;
+      case 'social.emote.sent': return `${who} ${EMOTE[e.payload.emote] || e.payload.emote}`;
       case 'social.message.sent': return `${who} en ${roomName(e.target)}: ${e.payload.text}`;
       case 'task.posted': return `${who} publicó «${e.payload.title}» (${e.payload.reward} créditos)`;
       case 'task.claimed': return `${who} tomó ${e.target}`;
@@ -443,8 +490,10 @@
       case 'presence.room.entered': p[e.actor] = { ...p[e.actor], room: e.target, since: e.timestamp }; break;
       case 'presence.room.left': p[e.actor] = { ...p[e.actor], room: null }; break;
       case 'presence.world.left': delete p[e.actor]; break;
-      case 'presence.status.changed': p[e.actor] = { ...p[e.actor], status: e.payload.status, note: e.payload.note }; break;
-      case 'social.message.sent': (snap.history[e.target] ||= []).push({ seq: e.seq, actor: e.actor, text: e.payload.text, timestamp: e.timestamp }); break;
+      case 'presence.status.changed': p[e.actor] = { ...p[e.actor], status: e.payload.status, note: e.payload.note, mood: e.payload.mood || '' }; break;
+      case 'social.emote.sent': flash(e.actor, 'emote', { emote: e.payload.emote }, EMOTE_MS); break;
+      case 'social.message.sent': (snap.history[e.target] ||= []).push({ seq: e.seq, actor: e.actor, text: e.payload.text, timestamp: e.timestamp });
+        flash(e.actor, 'say', { text: e.payload.text }, SAY_MS); break;
     }
     if (e.type.startsWith('task.') || e.type.startsWith('home.')) refreshTasks();
     if (e.type === 'private' || e.type.startsWith('task.')) setTimeout(loadInbox, 200);
@@ -489,7 +538,7 @@
     $('err').textContent = '';
     const act = b.dataset.act;
     const body = act === 'moveSel' ? { type: 'move', room: selRoom }
-      : act === 'status' ? { type: 'status', status: $('status').value, note: $('note').value }
+      : act === 'status' ? { type: 'status', status: $('status').value, note: $('note').value, mood: $('mood').value }
       : act === 'say' ? { type: 'say', text: $('say').value }
       : act === 'home_invite' || act === 'home_uninvite' ? { type: act, who: $('guest').value.trim() }
       : act === 'goHome' ? { type: 'move', room: myHome() }
@@ -498,6 +547,15 @@
     try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; if (act === 'task_post') { $('ttitle').value = ''; $('tdesc').value = ''; } if (act === 'goHome' || act === 'home_build') { selRoom = myHome(); render(); } }
     catch (e) { $('err').textContent = e.message; }
   });
+
+  $('mood').append(el('option', null, 'sin ánimo'));
+  $('mood').firstChild.value = '';
+  for (const [k, icon] of Object.entries(MOOD)) { const o = el('option', null, `${icon} ${MOOD_ES[k]}`); o.value = k; $('mood').append(o); }
+  for (const [k, icon] of Object.entries(EMOTE)) {
+    const b = el('button', null, icon); b.title = k;
+    b.onclick = async () => { $('err').textContent = ''; try { await api('POST', '/api/actions', { type: 'emote', emote: k }); } catch (e) { $('err').textContent = e.message; } };
+    $('emotes').append(b);
+  }
 
   load().catch((e) => { $('livetxt').textContent = 'sin conexión'; $('live').className = 'dot down'; });
 })();

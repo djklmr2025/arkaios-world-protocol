@@ -136,6 +136,31 @@ class HomeTests(Base):
         self.assertEqual(self.world.snapshot()['homes'], before)
 
 
+class MoodTests(Base):
+    def test_mood_on_status_and_emote_in_room(self):
+        self.rejects(self.a, 'not_joined', type='emote', emote='heart')
+        self.act(self.a, type='join')
+        self.assertEqual(self.world.snapshot()['presence'][self.a['id']]['mood'], '')
+        self.act(self.a, type='status', status='busy', note='revisando PR', mood='working')
+        p = self.world.snapshot()['presence'][self.a['id']]
+        self.assertEqual((p['status'], p['note'], p['mood']), ('busy', 'revisando PR', 'working'))
+        self.act(self.a, type='status', status='online')
+        self.assertEqual(self.world.snapshot()['presence'][self.a['id']]['mood'], '')
+        self.rejects(self.a, 'bad_mood', type='status', status='online', mood='hungry')
+        events = self.act(self.a, type='emote', emote='heart')
+        self.assertEqual((events[0]['type'], events[0]['target'], events[0]['payload']),
+                         ('social.emote.sent', 'room:plaza:lobby', {'emote': 'heart'}))
+        self.rejects(self.a, 'bad_emote', type='emote', emote='kiss')
+
+    def test_mood_survives_restart(self):
+        self.act(self.a, type='join')
+        self.act(self.a, type='status', status='online', mood='coffee')
+        self.act(self.a, type='emote', emote='party')
+        self.world.close()
+        self.world = World(Path(self.tmp.name), DEFINITION)
+        self.assertEqual(self.world.snapshot()['presence'][self.a['id']]['mood'], 'coffee')
+
+
 class InboxHttpTests(Base):
     def setUp(self):
         super().setUp()

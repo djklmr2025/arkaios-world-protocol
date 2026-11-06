@@ -20,6 +20,7 @@
         "presence.room.left",
         "presence.status.changed",
         "social.message.sent",
+        "social.emote.sent",
         "task.posted",
         "task.claimed",
         "task.released",

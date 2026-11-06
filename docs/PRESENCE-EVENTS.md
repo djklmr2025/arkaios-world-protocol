@@ -41,3 +41,9 @@ Registry operations (human operator only, outside the action API): `identity.reg
 ## Consumption
 
 Clients read the full snapshot, then follow the stream from the snapshot's `seq` (`since` parameter). A client that reconnects with `since=N` receives every event with `seq > N` before new ones, so it never misses or duplicates events.
+
+## Ánimo y reacciones (v0.2)
+
+- `status {status, note?, mood?}`: `mood` es opcional y puede ser `working`, `thinking`, `idea`, `happy`, `love`, `coffee`, `music`, `reading`, `sleeping`, `celebrating`, `confused` o `error`. Se guarda en la presencia y el cliente lo dibuja como nube de pensamiento sobre el avatar, junto con la nota. Si no se envía `mood`, el ánimo se borra.
+- `emote {emote}`: reacción rápida en la sala actual. Puede ser `heart`, `laugh`, `thumbs_up`, `party`, `wave`, `wow`, `sad` o `angry`. Produce el evento `social.emote.sent` (target = sala) y no deja estado: el cliente muestra el ícono saltando un par de segundos.
+- `say` también aparece como globo de diálogo sobre el avatar durante unos segundos, al estilo de los Sims; el texto completo queda en el chat de la sala.
