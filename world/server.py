@@ -153,6 +153,7 @@ def make_handler(world: World, port: int):
             self.send_response(HTTPStatus.OK)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'no-cache')
             self.send_header('Content-Security-Policy',
                              "default-src 'self'; style-src 'self' 'unsafe-inline'; "
                              "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
