@@ -161,6 +161,57 @@ class MoodTests(Base):
         self.assertEqual(self.world.snapshot()['presence'][self.a['id']]['mood'], 'coffee')
 
 
+class WalkTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.act(self.a, type='join')
+
+    def pos(self, entity):
+        p = self.world.snapshot()['presence'][entity['id']]
+        return p['x'], p['y']
+
+    def test_public_room_door_and_walls(self):
+        self.assertEqual(self.pos(self.a), (7, 8))
+        self.act(self.a, type='walk', x=3, y=2)
+        self.assertEqual(self.pos(self.a), (3, 2))
+        for x, y in [(0, 4), (15, 4), (4, 9), (16, 2), (-1, 2)]:
+            self.rejects(self.a, 'blocked', type='walk', x=x, y=y)
+        self.rejects(self.a, 'bad_cell', type='walk', x='3', y=2)
+        self.act(self.a, type='move', room='room:expo:empresas')
+        self.assertEqual(self.pos(self.a), (7, 8))
+
+    def test_home_furniture_blocks_and_seats_are_walkable(self):
+        home = self.act(self.a, type='home_build')[0]['target']
+        self.act(self.a, type='move', room=home)
+        self.act(self.a, type='place', item='door', x=5, y=9)
+        self.act(self.a, type='place', item='brick', x=2, y=2)
+        self.act(self.a, type='place', item='desk', x=3, y=3)
+        self.act(self.a, type='place', item='chair', x=3, y=4)
+        self.rejects(self.a, 'blocked', type='walk', x=2, y=2)
+        self.rejects(self.a, 'blocked', type='walk', x=3, y=3)
+        self.act(self.a, type='walk', x=3, y=4)
+        self.assertEqual(self.pos(self.a), (3, 4))
+        self.act(self.a, type='move', room='room:plaza:lobby')
+        self.act(self.a, type='move', room=home)
+        self.assertEqual(self.pos(self.a), (5, 8))
+
+    def test_knock_notifies_owner(self):
+        home = self.act(self.a, type='home_build')[0]['target']
+        self.rejects(self.a, 'own_home', type='knock', home=home)
+        self.act(self.b, type='join')
+        self.act(self.b, type='knock', home=home)
+        self.rejects(self.b, 'unknown_room', type='knock', home='room:casas:99')
+        notice = self.world.inbox(self.a['id'])['notices'][-1]
+        self.assertEqual((notice['type'], notice['actor'], notice['task']),
+                         ('home.knocked', self.b['id'], home))
+
+    def test_positions_survive_restart(self):
+        self.act(self.a, type='walk', x=10, y=3)
+        self.world.close()
+        self.world = World(Path(self.tmp.name), DEFINITION)
+        self.assertEqual(self.pos(self.a), (10, 3))
+
+
 class InboxHttpTests(Base):
     def setUp(self):
         super().setUp()

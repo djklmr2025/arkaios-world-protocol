@@ -19,6 +19,7 @@
         "presence.room.entered",
         "presence.room.left",
         "presence.status.changed",
+        "presence.position.changed",
         "social.message.sent",
         "social.emote.sent",
         "task.posted",
@@ -35,6 +36,7 @@
         "home.member.removed",
         "home.item.placed",
         "home.item.removed",
+        "home.knocked",
         "private"
       ],
       "description": "social.dm.* are private: the public stream replaces them with type 'private' and null actor/target/payload ({})."

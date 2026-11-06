@@ -6,27 +6,50 @@
     {
       "id": "district:plaza",
       "name": "Plaza central",
+      "floor": "floor",
       "rooms": [
-        { "id": "room:plaza:lobby", "name": "Lobby · Padrón Único", "zone": "public_sandbox", "capacity": 50 }
+        { "id": "room:plaza:lobby", "name": "Lobby · Padrón Único", "zone": "public_sandbox", "capacity": 50,
+          "props": [["plant", 1, 1], ["plant", 14, 1], ["art", 7, 0], ["art", 8, 0], ["sofa", 2, 5], ["table", 3, 6],
+                    ["sofa", 12, 5], ["table", 12, 6], ["cooler", 14, 7], ["coffee", 1, 7], ["rug", 6, 4], ["rug", 7, 4],
+                    ["rug", 8, 4], ["rug", 9, 4], ["rug", 6, 5], ["rug", 7, 5], ["rug", 8, 5], ["rug", 9, 5]] }
       ]
     },
     {
       "id": "district:expo",
       "name": "Expo Empleo Digital",
+      "floor": "floor",
       "rooms": [
-        { "id": "room:expo:aspirantes", "name": "Aspirantes", "zone": "public_sandbox", "capacity": 50 },
-        { "id": "room:expo:empresas", "name": "Empresas y reclutadores", "zone": "public_sandbox", "capacity": 50 },
-        { "id": "room:expo:galeria", "name": "Galería (solo observar)", "zone": "observation_only", "capacity": 0 }
+        { "id": "room:expo:aspirantes", "name": "Aspirantes", "zone": "public_sandbox", "capacity": 50,
+          "props": [["desk", 2, 2], ["chair", 2, 3], ["desk", 5, 2], ["chair", 5, 3], ["desk", 10, 2], ["chair", 10, 3],
+                    ["desk", 13, 2], ["chair", 13, 3], ["whiteboard", 7, 1], ["plant", 1, 7], ["plant", 14, 7]] },
+        { "id": "room:expo:empresas", "name": "Empresas y reclutadores", "zone": "public_sandbox", "capacity": 50,
+          "props": [["desk", 3, 3], ["computer", 4, 3], ["chair", 3, 4], ["desk", 11, 3], ["computer", 12, 3],
+                    ["chair", 11, 4], ["table", 7, 5], ["chair", 6, 5], ["chair", 8, 5], ["bookshelf", 1, 1],
+                    ["bookshelf", 14, 1], ["coffee", 14, 7]] },
+        { "id": "room:expo:galeria", "name": "Galería (solo observar)", "zone": "observation_only", "capacity": 0,
+          "props": [["art", 3, 0], ["art", 6, 0], ["art", 9, 0], ["art", 12, 0], ["plant", 1, 1], ["plant", 14, 1],
+                    ["beanbag", 5, 6], ["beanbag", 10, 6]] }
       ]
     },
     {
       "id": "district:taller",
       "name": "Taller de agentes",
+      "floor": "wood",
       "rooms": [
-        { "id": "room:taller:estudio", "name": "Estudio de agentes", "zone": "trusted_collaboration", "capacity": 8 },
-        { "id": "room:taller:biblioteca", "name": "Biblioteca", "zone": "public_sandbox", "capacity": 20 },
+        { "id": "room:taller:estudio", "name": "Estudio de agentes", "zone": "trusted_collaboration", "capacity": 8,
+          "props": [["desk", 2, 2], ["computer", 3, 2], ["chair", 2, 3], ["desk", 6, 2], ["computer", 7, 2],
+                    ["chair", 6, 3], ["desk", 10, 2], ["computer", 11, 2], ["chair", 10, 3], ["whiteboard", 13, 1],
+                    ["sofa", 12, 6], ["beanbag", 10, 7], ["coffee", 1, 7], ["speaker", 14, 4], ["plant", 1, 4]] },
+        { "id": "room:taller:biblioteca", "name": "Biblioteca", "zone": "public_sandbox", "capacity": 20,
+          "props": [["bookshelf", 1, 1], ["bookshelf", 2, 1], ["bookshelf", 3, 1], ["bookshelf", 12, 1],
+                    ["bookshelf", 13, 1], ["bookshelf", 14, 1], ["table", 7, 4], ["chair", 6, 4], ["chair", 8, 4],
+                    ["lamp", 9, 4], ["beanbag", 3, 7], ["beanbag", 12, 7], ["plant", 1, 7], ["rug", 6, 5],
+                    ["rug", 7, 5], ["rug", 8, 5]] },
         { "id": "room:taller:consejo", "name": "Sala del Consejo", "zone": "restricted", "capacity": 6,
-          "allow": ["operador", "claude", "elemia"] }
+          "allow": ["operador", "claude", "elemia"],
+          "props": [["table", 6, 4], ["table", 7, 4], ["table", 8, 4], ["table", 9, 4], ["chair", 6, 3], ["chair", 8, 3],
+                    ["chair", 6, 5], ["chair", 8, 5], ["chair", 10, 4], ["whiteboard", 7, 1], ["plant", 1, 1],
+                    ["plant", 14, 1], ["lamp", 14, 7]] }
       ]
     }
   ]

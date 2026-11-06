@@ -63,7 +63,9 @@
   .zone.home { color: #c084fc; }
   .av.sprite { background-color: #1e2a47; background-size: 400% 400%; background-position: 0 100%;
                image-rendering: pixelated; border-radius: 9px; color: transparent; }
-  .grid { position: relative; overflow: visible; }
+  .stage { position: relative; }
+  .people { position: absolute; inset: 2px; pointer-events: none; }
+  .citizen.me .tag { background: var(--accent); color: #0b1020; }
   .citizen { position: absolute; width: calc(100% / 16 * 1.6); aspect-ratio: 1; transform: translate(-19%, -45%);
              background-size: 400% 400%; image-rendering: pixelated; pointer-events: none; z-index: 3;
              animation: frames var(--speed, .9s) steps(var(--steps, 4)) infinite; }
@@ -129,10 +131,10 @@
     <div id="map"></div>
     <div id="homeview" class="home-view" hidden>
       <div class="home-head"><h2 id="hometitle"></h2><span class="muted" id="homemeta"></span></div>
-      <div class="grid" id="grid"></div>
+      <div class="stage"><div class="grid" id="grid"></div><div class="people" id="people"></div></div>
       <div id="buildbar" hidden>
         <div class="palette" id="palette"></div>
-        <div class="muted" style="font-size:12px;margin-top:6px">Elige una pieza y toca un cuadro. Cada cuadro lleva un piso y un objeto encima; con la esponja quitas primero el objeto.</div>
+        <div class="muted" id="buildhint" style="font-size:12px;margin-top:6px"></div>
       </div>
       <div class="credit">Arte de píxeles y personajes: Miniverse (licencia MIT, world/client/assets/LICENSE-miniverse.txt).</div>
     </div>
@@ -172,6 +174,7 @@
         <div class="row"><input id="ttitle" maxlength="120" placeholder="Nueva tarea (en tu sala)"><input id="treward" type="number" min="1" max="1000" value="10" style="flex:0 0 72px"></div>
         <div class="row"><input id="tdesc" maxlength="1000" placeholder="Descripción (opcional)"><button data-act="task_post">Publicar</button></div>
         <div class="row"><button data-act="home_build">Construir mi casa</button><button data-act="goHome">Ir a mi casa</button></div>
+        <div class="row"><button data-act="knock">🔔 Tocar el timbre de la casa elegida</button></div>
         <div class="row"><input id="guest" maxlength="40" placeholder="alias a invitar"><button data-act="home_invite">Invitar</button><button data-act="home_uninvite">Quitar</button></div>
       </div>
       <div class="err" id="err"></div>
@@ -205,7 +208,7 @@
   const myHome = () => 'room:casas:' + me.id.split(':').pop();
   const TILES = ['floor', 'wood', 'wall', 'brick', 'door', 'window', 'rug'];
   const OBJECTS = ['desk', 'chair', 'computer', 'sofa', 'beanbag', 'table', 'lamp', 'plant', 'bookshelf', 'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note'];
-  let tool = 'wood';
+  let tool = 'walk';
 
   const MOOD = { working: '💻', thinking: '🤔', idea: '💡', happy: '😊', love: '🥰', coffee: '☕', music: '🎵',
                  reading: '📖', sleeping: '💤', celebrating: '🎉', confused: '❓', error: '❗' };
@@ -320,18 +323,41 @@
     }
   }
 
+  const SEATS = new Set(['chair', 'sofa', 'beanbag']);
+  // Mirrors movement.entry_spot on the server: just inside a door, else the centre.
+  function entrySpot(roomId) {
+    const items = sceneItems(roomId);
+    const at = {}; for (const it of items) at[`${it.layer}:${it.x},${it.y}`] = it.item;
+    const ok = (x, y) => x >= 0 && x < 16 && y >= 0 && y < 10 && !WALLS.has(at[`tile:${x},${y}`]) && (!at[`object:${x},${y}`] || PASSABLE.has(at[`object:${x},${y}`]));
+    if (!items.length) return [7, 8];
+    const doors = items.filter((it) => it.layer === 'tile' && it.item === 'door').sort((a, b) => a.y - b.y || a.x - b.x);
+    for (const [x, y] of [...doors.map((d) => [d.x, d.y - 1]), ...doors.map((d) => [d.x, d.y + 1]), [8, 5]]) if (ok(x, y)) return [x, y];
+    return [8, 5];
+  }
+  const PASSABLE = new Set([...SEATS, 'note']);
+  const WALLS = new Set(['wall', 'brick', 'window']);
+  const sceneItems = (roomId) => homeOf(roomId)?.items || snap.scenes?.[roomId] || [];
+
   function renderHome() {
-    const home = homeOf(selRoom), view = $('homeview');
-    view.hidden = !home;
-    if (!home) return;
-    $('hometitle').textContent = home.name;
-    const guests = home.guests.map(nameOf).join(', ');
-    $('homemeta').textContent = `de ${nameOf(home.owner)}${guests ? ' · invitados: ' + guests : ''} · ${home.items.length} piezas`;
-    const member = me && (me.id === home.owner || home.guests.includes(me.id));
-    const canBuild = Boolean(member && snap.presence[me.id]?.room === home.id);
+    const roomId = selRoom, home = homeOf(roomId), items = sceneItems(roomId), view = $('homeview');
+    view.hidden = !items.length;
+    if (!items.length) return;
+    $('hometitle').textContent = roomName(roomId);
+    if (home) {
+      const guests = home.guests.map(nameOf).join(', ');
+      $('homemeta').textContent = `casa de ${nameOf(home.owner)}${guests ? ' · invitados: ' + guests : ''} · ${home.items.length} piezas`;
+    } else {
+      const zone = Object.values(snap.world.districts).flatMap((d) => d.rooms).find((r) => r.id === roomId)?.zone;
+      $('homemeta').textContent = ZONE[zone] || '';
+    }
+    const inRoom = Boolean(me && snap.presence[me.id]?.room === roomId);
+    const member = Boolean(home && me && (me.id === home.owner || home.guests.includes(me.id)));
+    const canBuild = member && inRoom;
+    if (!canBuild && tool !== 'walk') tool = 'walk';
     const cells = {};
-    for (const it of home.items) (cells[`${it.x},${it.y}`] ||= {})[it.layer] = it;
-    const grid = $('grid'); grid.replaceChildren(); grid.className = 'grid' + (canBuild ? ' build' : '');
+    for (const it of items) (cells[`${it.x},${it.y}`] ||= {})[it.layer] = it;
+    const grid = $('grid'); grid.replaceChildren();
+    grid.className = 'grid' + (inRoom ? ' build' : '');
     for (let y = 0; y < 10; y++) for (let x = 0; x < 16; x++) {
       const c = cells[`${x},${y}`] || {}, cell = el('div', 'cell');
       if (c.tile) cell.style.backgroundImage = `url(/assets/${c.tile.item}.png)`;
@@ -340,55 +366,80 @@
         else { const i = el('img'); i.src = `/assets/${c.object.item}.png`; i.alt = c.object.item; cell.append(i); }
         cell.title = c.object.label || c.object.item;
       }
-      if (canBuild) cell.onclick = () => buildAt(x, y, c);
+      if (inRoom) cell.onclick = () => (tool === 'walk' ? walkTo(x, y) : buildAt(x, y, c));
       grid.append(cell);
     }
-    placeCitizens(home, cells, grid);
-    $('buildbar').hidden = !canBuild;
-    if (canBuild && !$('palette').childElementCount) {
-      for (const name of [...TILES, ...OBJECTS, 'erase']) {
-        const b = el('button'); b.title = name === 'erase' ? 'quitar' : name; b.dataset.tool = name;
+    renderPeople(roomId, cells);
+    $('buildbar').hidden = !inRoom;
+    const palette = $('palette');
+    const wanted = canBuild ? 'build' : 'walk';
+    if (palette.dataset.mode !== wanted) {
+      palette.replaceChildren(); palette.dataset.mode = wanted;
+      for (const name of ['walk', ...(canBuild ? [...TILES, ...OBJECTS, 'erase'] : [])]) {
+        const b = el('button'); b.title = name === 'erase' ? 'quitar' : name === 'walk' ? 'caminar' : name; b.dataset.tool = name;
         if (name === 'erase') b.textContent = '🧽';
+        else if (name === 'walk') b.textContent = '🚶';
         else if (name === 'note') b.textContent = '📝';
         else { const i = el('img'); i.src = `/assets/${name}.png`; i.alt = name; b.append(i); }
         b.onclick = () => { tool = name; markTool(); };
-        $('palette').append(b);
+        palette.append(b);
       }
-      markTool();
+    }
+    markTool();
+    $('buildhint').textContent = canBuild
+      ? 'Con 🚶 tocas un cuadro para caminar; con una pieza la pones; la esponja quita (primero el objeto).'
+      : 'Toca un cuadro libre para caminar. Las sillas, sofás y pufs sirven para sentarse.';
+  }
+
+  const people = {};
+  let peopleRoom = null;
+  function setSprite(c, sheet, row, steps, speed) {
+    c.style.backgroundImage = `url(/assets/${sheet}.png)`;
+    c.style.backgroundPositionY = `${row * 100 / 3}%`;
+    c.style.setProperty('--steps', steps);
+    c.style.setProperty('--end', `${steps * 100 / 3}%`);
+    c.style.setProperty('--speed', speed);
+  }
+  const placeAt = (c, x, y) => { c.style.left = `${x / 16 * 100}%`; c.style.top = `${y / 10 * 100}%`; };
+
+  function renderPeople(roomId, cells) {
+    const layer = $('people');
+    if (peopleRoom !== roomId) { layer.replaceChildren(); for (const k of Object.keys(people)) delete people[k]; peopleRoom = roomId; }
+    const inside = Object.entries(snap.presence).filter(([, p]) => p.room === roomId).map(([id]) => id);
+    for (const id of Object.keys(people)) if (!inside.includes(id)) { people[id].remove(); delete people[id]; }
+    for (const id of inside) {
+      const p = snap.presence[id], x = p.x ?? 7, y = p.y ?? 8;
+      let c = people[id];
+      if (!c) { c = el('div', 'citizen'); placeAt(c, x, y); c.dataset.x = x; c.dataset.y = y; layer.append(c); people[id] = c; }
+      const ox = Number(c.dataset.x), oy = Number(c.dataset.y);
+      if (ox !== x || oy !== y) {
+        const dx = x - ox, dy = y - oy, ms = Math.min(4000, Math.round(Math.hypot(dx, dy) * 260));
+        const row = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 0 : 1);
+        setSprite(c, `${character(id)}_walk`, row, 4, '.5s');
+        c.style.transition = `left ${ms}ms linear, top ${ms}ms linear`;
+        placeAt(c, x, y); c.dataset.x = x; c.dataset.y = y;
+        c.dataset.walkUntil = Date.now() + ms;
+        setTimeout(render, ms + 30);
+      }
+      if (!(Number(c.dataset.walkUntil || 0) > Date.now())) {
+        const seat = SEATS.has(cells[`${x},${y}`]?.object?.item);
+        const pose = p.status === 'away' ? POSE.away : (seat || p.status === 'busy') ? POSE.busy : POSE.online;
+        setSprite(c, `${character(id)}_actions`, pose.row, pose.steps, pose.speed);
+      }
+      const icon = moodIcon(p), said = active(id, 'say'), pop = active(id, 'emote');
+      const kids = [el('span', 'tag', nameOf(id))];
+      if (said) kids.push(el('div', 'say', said.text.length > 90 ? said.text.slice(0, 88) + '…' : said.text));
+      else if (icon || p.note) kids.push(el('div', 'think', `${icon} ${p.note || MOOD_ES[p.mood] || ''}`.trim()));
+      if (pop) kids.push(el('span', 'pop', EMOTE[pop.emote]));
+      c.replaceChildren(...kids);
+      c.classList.toggle('me', Boolean(me && id === me.id));
+      c.title = `${nameOf(id)} · ${p.status}${p.note ? ' — ' + p.note : ''}`;
     }
   }
-  function placeCitizens(home, cells, grid) {
-    const inside = Object.entries(snap.presence).filter(([, p]) => p.room === home.id).map(([id]) => id)
-      .sort((a, b) => (a === home.owner ? -1 : b === home.owner ? 1 : a.localeCompare(b)));
-    const blocked = new Set(['wall', 'brick', 'window', 'door']);
-    const free = [];
-    for (let y = 1; y < 9; y++) for (let x = 1; x < 15; x++) {
-      const c = cells[`${x},${y}`] || {};
-      if (!c.object && !(c.tile && blocked.has(c.tile.item))) free.push([x, y]);
-    }
-    free.sort((a, b) => Math.hypot(a[0] - 7.5, a[1] - 5) - Math.hypot(b[0] - 7.5, b[1] - 5));
-    const chair = home.items.find((it) => it.layer === 'object' && it.item === 'chair');
-    for (const id of inside) {
-      const status = snap.presence[id].status || 'online';
-      let spot = null, pose = POSE[status] || POSE.online;
-      if (id === home.owner && chair && status !== 'away') { spot = [chair.x, chair.y]; pose = POSE.busy; }
-      else spot = free.shift();
-      if (!spot) continue;
-      const c = el('div', 'citizen');
-      c.style.left = `${spot[0] / 16 * 100}%`; c.style.top = `${spot[1] / 10 * 100}%`;
-      c.style.backgroundImage = `url(/assets/${character(id)}_actions.png)`;
-      c.style.backgroundPositionY = `${pose.row * 100 / 3}%`;
-      c.style.setProperty('--steps', pose.steps);
-      c.style.setProperty('--end', `${pose.steps * 100 / 3}%`);
-      c.style.setProperty('--speed', pose.speed);
-      c.append(el('span', 'tag', nameOf(id)));
-      const p = snap.presence[id], icon = moodIcon(p), said = active(id, 'say'), pop = active(id, 'emote');
-      if (said) c.append(el('div', 'say', said.text.length > 90 ? said.text.slice(0, 88) + '…' : said.text));
-      else if (icon || p.note) c.append(el('div', 'think', `${icon} ${p.note || MOOD_ES[p.mood] || ''}`.trim()));
-      if (pop) c.append(el('span', 'pop', EMOTE[pop.emote]));
-      c.title = `${nameOf(id)} · ${status}${snap.presence[id].note ? ' — ' + snap.presence[id].note : ''}`;
-      grid.append(c);
-    }
+
+  async function walkTo(x, y) {
+    $('err').textContent = '';
+    try { await api('POST', '/api/actions', { type: 'walk', x, y }); } catch (e) { $('err').textContent = e.message; }
   }
   const markTool = () => document.querySelectorAll('#palette button').forEach((b) => b.classList.toggle('on', b.dataset.tool === tool));
 
@@ -417,6 +468,7 @@
       for (const m of items) {
         const line = m.kind === 'dm' ? `${nameOf(m.from)} → tú: ${m.text}`
           : m.kind === 'sent' ? `tú → ${nameOf(m.to)}: ${m.text}`
+          : m.type === 'home.knocked' ? `🔔 ${nameOf(m.actor)} tocó el timbre de «${m.title}»`
           : `Aviso: ${nameOf(m.actor)} ${NOTICE[m.type] || m.type} «${m.title}»`;
         box.append(el('p', m.seq > j.read_upto && m.kind !== 'sent' ? 'new' : null, line));
       }
@@ -467,6 +519,8 @@
       case 'home.member.removed': return `${who} quitó a ${nameOf(e.payload.guest)} de su casa`;
       case 'home.item.placed': return `${who} puso ${e.payload.item} en ${roomName(e.target)}`;
       case 'home.item.removed': return null;
+      case 'home.knocked': return `${who} tocó el timbre de ${roomName(e.target)} 🔔`;
+      case 'presence.position.changed': return null;
       case 'private': return null;
       default: return e.type;
     }
@@ -487,7 +541,8 @@
       case 'identity.registered': snap.entities.push(e.payload); break;
       case 'identity.revoked': { const x = ent(e.target); if (x) x.status = 'revoked'; break; }
       case 'presence.world.joined': p[e.actor] = { room: null, status: 'online', note: '', since: e.timestamp }; break;
-      case 'presence.room.entered': p[e.actor] = { ...p[e.actor], room: e.target, since: e.timestamp }; break;
+      case 'presence.room.entered': { const at = entrySpot(e.target); p[e.actor] = { ...p[e.actor], room: e.target, x: at[0], y: at[1], since: e.timestamp }; break; }
+      case 'presence.position.changed': p[e.actor] = { ...p[e.actor], x: e.payload.x, y: e.payload.y }; break;
       case 'presence.room.left': p[e.actor] = { ...p[e.actor], room: null }; break;
       case 'presence.world.left': delete p[e.actor]; break;
       case 'presence.status.changed': p[e.actor] = { ...p[e.actor], status: e.payload.status, note: e.payload.note, mood: e.payload.mood || '' }; break;
@@ -496,7 +551,8 @@
         flash(e.actor, 'say', { text: e.payload.text }, SAY_MS); break;
     }
     if (e.type.startsWith('task.') || e.type.startsWith('home.')) refreshTasks();
-    if (e.type === 'private' || e.type.startsWith('task.')) setTimeout(loadInbox, 200);
+    if (e.type === 'home.knocked' && me && homeOf(e.target)?.owner === me.id) flash(e.actor, 'emote', { emote: 'wave' }, EMOTE_MS);
+    if (e.type === 'private' || e.type.startsWith('task.') || e.type === 'home.knocked') setTimeout(loadInbox, 200);
     snap.seq = e.seq;
     feedLine(e);
   }
@@ -542,6 +598,7 @@
       : act === 'say' ? { type: 'say', text: $('say').value }
       : act === 'home_invite' || act === 'home_uninvite' ? { type: act, who: $('guest').value.trim() }
       : act === 'goHome' ? { type: 'move', room: myHome() }
+      : act === 'knock' ? { type: 'knock', home: selRoom }
       : act === 'task_post' ? { type: 'task_post', title: $('ttitle').value, reward: Number($('treward').value), description: $('tdesc').value }
       : { type: act };
     try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; if (act === 'task_post') { $('ttitle').value = ''; $('tdesc').value = ''; } if (act === 'goHome' || act === 'home_build') { selRoom = myHome(); render(); } }

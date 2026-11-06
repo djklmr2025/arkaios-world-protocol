@@ -8,6 +8,7 @@ import re
 
 import homes as home_rules
 import mail as mail_rules
+import movement
 import tasks as task_board
 
 ZONES = {'public_sandbox', 'trusted_collaboration', 'restricted',
@@ -42,6 +43,7 @@ def load_world_definition(raw):
             if room['zone'] not in ZONES:
                 raise ValueError('unknown zone ' + room['zone'])
             rooms[room['id']] = {**room, 'district': district['id'],
+                                 'floor': district.get('floor', 'floor'),
                                  'allow': tuple(room.get('allow', ()))}
     if raw['spawn'] not in rooms or rooms[raw['spawn']]['zone'] != 'public_sandbox':
         raise ValueError('spawn must be an existing public_sandbox room')
@@ -64,6 +66,7 @@ class WorldState:
         self.board = task_board.TaskBoard()
         self.mail = mail_rules.Mailboxes()
         self.homes = home_rules.Homes()
+        self.scenes = {rid: movement.public_scene(room) for rid, room in definition['rooms'].items()}
 
     # ---------- queries ----------
 
@@ -75,6 +78,9 @@ class WorldState:
 
     def room(self, room_id):
         return self.definition['rooms'].get(room_id) or self.homes.room(room_id)
+
+    def scene(self, room_id):
+        return self.homes.homes.get(room_id) or self.scenes.get(room_id)
 
     def inbox(self, entity_id, since=0):
         return self.mail.view(entity_id, since)
@@ -88,6 +94,7 @@ class WorldState:
             'history': {rid: list(msgs) for rid, msgs in self.history.items()},
             **self.board.snapshot(self.entities),
             'homes': self.homes.snapshot(),
+            'scenes': {rid: movement.scene_items(sc) for rid, sc in self.scenes.items()},
         }
 
     # ---------- registry decisions (human operator only) ----------
@@ -146,6 +153,7 @@ class WorldState:
             'join': self._decide_join, 'move': self._decide_move,
             'status': self._decide_status, 'say': self._decide_say,
             'leave': self._decide_leave, 'emote': self._decide_emote,
+            'walk': self._decide_walk, 'knock': self._decide_knock,
         }.get(kind)
         if handler is None and kind in task_board.ACTIONS:
             return self.board.decide(entity, action, self._require_joined(entity))
@@ -157,7 +165,7 @@ class WorldState:
             return self._decide_home(entity, action)
         if handler is None:
             raise Rejected('bad_action', 'action type must be join, move, status, say, leave, '
-                           'emote, dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
+                           'emote, walk, knock, dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
                            'place or remove')
         return handler(entity, action)
 
@@ -190,6 +198,20 @@ class WorldState:
             raise Rejected('bad_mood', 'mood must be one of: ' + ', '.join(MOODS))
         return [('presence.status.changed', entity['id'], entity['id'],
                  {'status': status, 'note': note, 'mood': mood})]
+
+    def _decide_walk(self, entity, action):
+        current = self._require_joined(entity)
+        return movement.decide_walk(entity['id'], current, self.scene(current), action)
+
+    def _decide_knock(self, entity, action):
+        self._require_joined(entity)
+        home_id = action.get('home')
+        home = self.homes.homes.get(home_id) if isinstance(home_id, str) else None
+        if home is None:
+            raise Rejected('unknown_room', 'no such home')
+        if home['owner'] == entity['id']:
+            raise Rejected('own_home', 'you are the owner; just go in')
+        return [('home.knocked', entity['id'], home_id, {})]
 
     def _decide_emote(self, entity, action):
         current = self._require_joined(entity)
@@ -274,8 +296,11 @@ class WorldState:
             self.presence[actor] = {'room': None, 'status': 'online', 'note': '', 'mood': '',
                                     'since': event['timestamp']}
         elif etype == 'presence.room.entered':
-            self.presence[actor] = {**self.presence[actor], 'room': target,
+            x, y = movement.entry_spot(self.scene(target))
+            self.presence[actor] = {**self.presence[actor], 'room': target, 'x': x, 'y': y,
                                     'since': event['timestamp']}
+        elif etype == 'presence.position.changed':
+            self.presence[actor] = {**self.presence[actor], 'x': payload['x'], 'y': payload['y']}
         elif etype == 'presence.room.left':
             self.presence[actor] = {**self.presence[actor], 'room': None}
         elif etype == 'presence.world.left':
@@ -298,6 +323,9 @@ class WorldState:
                 self.mail.notify(sorted(parties), event, before)
         elif etype in mail_rules.PRIVATE_TYPES:
             self.mail.apply(event)
+        elif etype == 'home.knocked':
+            home = self.homes.homes[target]
+            self.mail.notify([home['owner']], event, {'id': target, 'title': home['name']})
         elif etype.startswith('home.'):
             self.homes.apply(event)
             if etype == 'home.built':
