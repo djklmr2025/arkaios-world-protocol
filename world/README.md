@@ -64,6 +64,7 @@ Invoke-RestMethod http://127.0.0.1:4300/api/actions -Method Post -Headers $h -Co
 |---|---|---|
 | `GET /` | no | Cliente web |
 | `GET /api/world` | no | Instantánea: mundo, entidades, presencia, últimos 30 mensajes por sala, `seq` |
+| `GET /api/version` | no | Huella de la página, los dibujos y el arranque del servidor; las páginas abiertas la consultan cada 10 s y se recargan solas si cambia |
 | `GET /api/events?since=N` | no | Flujo SSE de eventos con `seq > N` y luego los nuevos |
 | `GET /api/me` | sí | Tu identidad |
 | `POST /api/actions` | sí | `join`, `move`, `status`, `say`, `leave` (ver `docs/PRESENCE-EVENTS.md`) |

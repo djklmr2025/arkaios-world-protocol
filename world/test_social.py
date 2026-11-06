@@ -1,6 +1,7 @@
 """DM/inbox privacy and home tests. Run: python -m unittest discover -s world -v"""
 import http.client
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -253,6 +254,32 @@ class InboxHttpTests(Base):
         conn.close()
         self.assertEqual((event['seq'], event['type'], event['actor'], event['payload']),
                          (4, 'private', None, {}))
+
+
+    def test_version_changes_when_client_changes(self):
+        before = json.loads(self.get('/api/version')[1])['version']
+        self.assertEqual(before, json.loads(self.get('/api/version')[1])['version'])
+        html = server.CLIENT_HTML
+        st = html.stat()
+        try:
+            os.utime(html, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000))
+            self.assertNotEqual(before, json.loads(self.get('/api/version')[1])['version'])
+        finally:
+            os.utime(html, ns=(st.st_atime_ns, st.st_mtime_ns))
+
+    def test_asset_etag_revalidates(self):
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=5)
+        host = {'Host': f'127.0.0.1:{self.port}'}
+        try:
+            conn.request('GET', '/assets/desk.png', headers=host)
+            resp = conn.getresponse(); resp.read()
+            etag = resp.getheader('ETag')
+            self.assertEqual((resp.status, resp.getheader('Cache-Control')), (200, 'no-cache'))
+            conn.request('GET', '/assets/desk.png', headers={**host, 'If-None-Match': etag})
+            resp = conn.getresponse(); resp.read()
+            self.assertEqual(resp.status, 304)
+        finally:
+            conn.close()
 
 
 if __name__ == '__main__':

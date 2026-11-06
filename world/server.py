@@ -10,6 +10,7 @@ register/revoke/list need the server stopped (one writer per state dir).
 The access key is printed once by `register`; only its SHA-256 is stored.
 """
 import argparse
+import hashlib
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -36,6 +37,16 @@ MAX_BODY = 4096
 RATE_WINDOW_S = 10.0
 RATE_MAX_ACTIONS = 20
 SSE_WAIT_S = 15.0
+BOOT_ID = format(time.time_ns(), 'x')
+
+
+def client_version() -> str:
+    """Changes when the page, any asset or the server process changes: open pages reload."""
+    digest = hashlib.sha256(BOOT_ID.encode())
+    for path in [CLIENT_HTML, *sorted(ASSETS_DIR.glob('*.png'))]:
+        st = path.stat()
+        digest.update(f'{path.name}:{st.st_mtime_ns}:{st.st_size};'.encode())
+    return digest.hexdigest()[:16]
 
 
 class RateLimiter:
@@ -101,6 +112,8 @@ def make_handler(world: World, port: int):
                 return self._serve_client()
             if ASSET_RE.match(url.path):
                 return self._serve_asset(ASSET_RE.match(url.path).group(1))
+            if url.path == '/api/version':
+                return self._send_json(HTTPStatus.OK, {'ok': True, 'version': client_version()})
             if url.path == '/api/world':
                 return self._send_json(HTTPStatus.OK, {'ok': True, **world.snapshot()})
             if url.path == '/api/me':
@@ -164,11 +177,20 @@ def make_handler(world: World, port: int):
             path = ASSETS_DIR / f'{name}.png'
             if not path.is_file():
                 return self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such asset')
+            st = path.stat()
+            etag = f'"{st.st_mtime_ns:x}-{st.st_size:x}"'
+            if self.headers.get('If-None-Match') == etag:
+                self.send_response(HTTPStatus.NOT_MODIFIED)
+                self.send_header('ETag', etag)
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                return
             data = path.read_bytes()
             self.send_response(HTTPStatus.OK)
             self.send_header('Content-Type', 'image/png')
             self.send_header('Content-Length', str(len(data)))
-            self.send_header('Cache-Control', 'max-age=3600')
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('ETag', etag)
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
             self.wfile.write(data)

@@ -192,6 +192,7 @@
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const FEED_BACKLOG = 30;
+  const VERSION_POLL_MS = 10000;
   let snap = null, selRoom = null, key = '', me = null, es = null, lastFeedSeq = 0;
 
   const hue = (s) => {
@@ -557,11 +558,24 @@
     feedLine(e);
   }
 
+  // Auto-update: when the page, an asset or the server changes, reload by itself (no Ctrl+F5).
+  let clientVersion = null;
+  async function checkVersion() {
+    try {
+      const v = (await (await fetch('/api/version', { cache: 'no-store' })).json()).version;
+      if (clientVersion && v && v !== clientVersion) location.reload();
+      clientVersion = clientVersion || v;
+    } catch { /* server down: the SSE reconnect loop handles it */ }
+  }
+  checkVersion();
+  setInterval(checkVersion, VERSION_POLL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
+
   function connect() {
     if (es) es.close();
     // Replay the last events too: they only fill the feed, state already includes them.
     es = new EventSource('/api/events?since=' + Math.max(0, snap.seq - FEED_BACKLOG));
-    es.onopen = () => { $('live').className = 'dot live'; $('livetxt').textContent = 'en vivo'; };
+    es.onopen = () => { $('live').className = 'dot live'; $('livetxt').textContent = 'en vivo'; checkVersion(); };
     es.onmessage = (m) => { apply(JSON.parse(m.data)); render(); };
     es.onerror = () => {
       $('live').className = 'dot down'; $('livetxt').textContent = 'reconectando…';
