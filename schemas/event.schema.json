@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/djklmr2025/arkaios-world-protocol/schemas/event.schema.json",
+  "title": "ARKAIOS WORLD event envelope v0.1",
+  "description": "Every state change is one of these. World state = ordered replay of events by seq.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "seq", "event_id", "type", "timestamp", "world", "actor", "payload"],
+  "properties": {
+    "v": { "const": 1 },
+    "seq": { "type": "integer", "minimum": 1, "description": "Strictly increasing, gap-free per world." },
+    "event_id": { "type": "string", "pattern": "^evt_[0-9a-f]{24}$" },
+    "type": {
+      "enum": [
+        "identity.registered",
+        "identity.revoked",
+        "presence.world.joined",
+        "presence.world.left",
+        "presence.room.entered",
+        "presence.room.left",
+        "presence.status.changed",
+        "social.message.sent"
+      ]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "world": { "type": "string", "pattern": "^world:[a-z0-9-]+:[a-z0-9-]+$" },
+    "actor": { "type": "string", "description": "Entity ID, or 'registry' for registry events." },
+    "target": { "type": ["string", "null"] },
+    "payload": { "type": "object" }
+  }
+}

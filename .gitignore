@@ -2,3 +2,4 @@
 .venv-pilot/
 __pycache__/
 .music-source/
+.local-world/

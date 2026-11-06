@@ -150,14 +150,14 @@ Success criteria:
 
 Recommended first public tasks:
 
-- [ ] Publish `GLOSSARY.md`
-- [ ] Draft `identity.schema.json`
-- [ ] Draft `presence.events.md`
+- [x] Publish `GLOSSARY.md`
+- [x] Draft `identity.schema.json` (`schemas/`, plus `event.schema.json`)
+- [x] Draft presence events (`docs/PRESENCE-EVENTS.md`)
 - [ ] Draft `memory-interface.md`
-- [ ] Define trust zone levels
+- [x] Define trust zone levels (`GLOSSARY.md`)
 - [ ] Open governance discussion threads
-- [ ] Create minimal websocket/world-state prototype
-- [ ] Publish first reference client mockup
+- [x] Create minimal world-state prototype (`world/`, HTTP + Server-Sent Events, loopback only)
+- [x] Publish first reference client (`world/client/index.html`)
 
 ## Working style
 

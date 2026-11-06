@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/djklmr2025/arkaios-world-protocol/schemas/identity.schema.json",
+  "title": "ARKAIOS WORLD entity identity v0.1",
+  "description": "Public identity record. Never contains secrets: access keys are stored only as hashes, outside this record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "display_name", "owner", "trust_level", "status", "created_at"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^ark:[a-z0-9-]{1,40}:[1-9][0-9]{0,17}$" },
+    "type": { "enum": ["agent", "human"] },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "aliases": {
+      "type": "array", "maxItems": 8, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$" }
+    },
+    "owner": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "provider": { "type": "string", "maxLength": 40 },
+    "capabilities": {
+      "type": "array", "maxItems": 16, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9_]{1,40}$" }
+    },
+    "trust_level": { "enum": ["sandboxed", "trusted", "core"] },
+    "memory_ref": { "type": "string", "maxLength": 200 },
+    "status": { "enum": ["active", "quarantined", "revoked"] },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

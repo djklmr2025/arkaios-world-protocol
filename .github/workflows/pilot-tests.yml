@@ -49,6 +49,8 @@ jobs:
         run: python -m unittest discover -s simulator/agent_economy -v
       - name: Ledger and four-process network tests
         run: python -m unittest discover -s testnet -v
+      - name: Reference world (Phase 1) tests
+        run: python -m unittest discover -s world -v
       - name: Integrated restart and tampering regression
         env:
           MUSIC_STUDIO_ROOT: ${{ github.workspace }}/.music-source

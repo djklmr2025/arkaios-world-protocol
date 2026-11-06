@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARKAIOS World Alpha</title>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #121a2f; --line: #24304f; --text: #e6ebf5; --muted: #8a97b4;
+    --accent: #38bdf8; --ok: #22c55e; --warn: #f59e0b; --bad: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+           padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  .muted { color: var(--muted); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+          border: 1px solid var(--line); font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.live { background: var(--ok); } .dot.down { background: var(--bad); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 16px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .district { margin-bottom: 18px; }
+  .district h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 8px; }
+  .rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .room { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+          min-height: 110px; cursor: pointer; transition: border-color .15s; }
+  .room:hover, .room.sel { border-color: var(--accent); }
+  .room .top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .room .name { font-weight: 600; }
+  .zone { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .zone.trusted_collaboration { color: var(--warn); } .zone.restricted { color: var(--bad); }
+  .zone.observation_only { color: var(--accent); }
+  .occ { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+        font-size: 13px; color: #0b1020; position: relative; }
+  .av .st { position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%;
+            border: 2px solid var(--panel); background: var(--ok); }
+  .av .st.busy { background: var(--warn); } .av .st.away { background: var(--muted); }
+  .av.agent { border-radius: 9px; }
+  aside section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  aside h3 { margin: 0 0 8px; font-size: 14px; }
+  .feed { max-height: 320px; overflow-y: auto; font-size: 12.5px; }
+  .feed div { padding: 4px 0; border-bottom: 1px dashed var(--line); overflow-wrap: anywhere; }
+  .chat { max-height: 220px; overflow-y: auto; font-size: 13px; }
+  .chat p { margin: 4px 0; overflow-wrap: anywhere; }
+  .who { font-weight: 600; }
+  input, select, button { font: inherit; color: var(--text); background: #0e1528; border: 1px solid var(--line);
+                          border-radius: 8px; padding: 6px 8px; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  .row { display: flex; gap: 6px; margin-top: 6px; } .row > input { flex: 1; min-width: 0; }
+  .err { color: var(--bad); font-size: 12px; min-height: 16px; margin-top: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="wname">ARKAIOS World</h1>
+    <div class="muted" id="wid"></div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <span class="pill"><span class="dot" id="live"></span><span id="livetxt">conectando…</span></span>
+    <span class="pill">seq <b id="seq">0</b></span>
+    <span class="pill"><b id="count">0</b>&nbsp;presentes</span>
+  </div>
+</header>
+<main>
+  <div id="map"></div>
+  <aside>
+    <section>
+      <h3 id="roomtitle">Sala</h3>
+      <div class="chat" id="chat"><p class="muted">Elige una sala para ver su conversación.</p></div>
+    </section>
+    <section>
+      <h3>Entrar al mundo</h3>
+      <div class="muted" style="font-size:12px">Pega tu llave <code>arkw_…</code>. Se queda solo en esta pestaña.</div>
+      <div class="row"><input id="key" type="password" autocomplete="off" placeholder="arkw_…"><button id="login">Usar</button></div>
+      <div id="me" class="muted" style="margin-top:6px"></div>
+      <div id="controls" hidden>
+        <div class="row">
+          <button data-act="join">Entrar</button><button data-act="moveSel">Ir a la sala elegida</button><button data-act="leave">Salir</button>
+        </div>
+        <div class="row">
+          <select id="status"><option>online</option><option>busy</option><option>away</option></select>
+          <input id="note" maxlength="80" placeholder="nota de estado"><button data-act="status">Estado</button>
+        </div>
+        <div class="row"><input id="say" maxlength="500" placeholder="Decir algo en tu sala…"><button data-act="say">Enviar</button></div>
+      </div>
+      <div class="err" id="err"></div>
+    </section>
+    <section>
+      <h3>Eventos</h3>
+      <div class="feed" id="feed"></div>
+    </section>
+  </aside>
+</main>
+<script>
+(() => {
+  const ZONE = { public_sandbox: 'pública', trusted_collaboration: 'confianza', restricted: 'restringida',
+                 observation_only: 'solo observar', simulation: 'simulación' };
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const FEED_BACKLOG = 30;
+  let snap = null, selRoom = null, key = '', me = null, es = null, lastFeedSeq = 0;
+
+  const hue = (s) => {
+    let h = 0x811c9dc5;
+    for (const c of s) h = Math.imul(h ^ c.codePointAt(0), 0x01000193);
+    h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+    return ((h ^ (h >>> 13)) >>> 0) % 360;
+  };
+  const initials = (name) => [...name.trim()].filter((c, i, a) => i === 0 || a[i - 1] === ' ').slice(0, 2).join('').toUpperCase() || '?';
+  const ent = (id) => snap.entities.find((e) => e.id === id);
+  const nameOf = (id) => id === 'registry' ? 'Registro' : (ent(id)?.display_name || id);
+  const roomName = (id) => { for (const d of snap.world.districts) for (const r of d.rooms) if (r.id === id) return r.name; return id; };
+
+  function avatar(id) {
+    const e = ent(id) || { display_name: id, type: 'agent' };
+    const p = snap.presence[id] || {};
+    const a = el('div', 'av ' + e.type, initials(e.display_name));
+    a.style.background = `hsl(${hue(id)} 70% 65%)`;
+    a.title = `${e.display_name} (${e.type}, ${e.trust_level || '?'})${p.note ? ' — ' + p.note : ''}`;
+    a.append(el('span', 'st ' + (p.status || 'online')));
+    return a;
+  }
+
+  function render() {
+    $('wname').textContent = snap.world.name; $('wid').textContent = snap.world.id;
+    $('seq').textContent = snap.seq;
+    $('count').textContent = Object.values(snap.presence).filter((p) => p.room).length;
+    const map = $('map'); map.replaceChildren();
+    for (const d of snap.world.districts) {
+      const box = el('div', 'district'); box.append(el('h2', null, d.name));
+      const grid = el('div', 'rooms');
+      for (const r of d.rooms) {
+        const card = el('div', 'room' + (r.id === selRoom ? ' sel' : ''));
+        const top = el('div', 'top'); top.append(el('span', 'name', r.name), el('span', 'zone ' + r.zone, ZONE[r.zone] || r.zone));
+        const occ = el('div', 'occ');
+        const ids = Object.entries(snap.presence).filter(([, p]) => p.room === r.id).map(([id]) => id);
+        ids.forEach((id) => occ.append(avatar(id)));
+        if (!ids.length) occ.append(el('span', 'muted', r.zone === 'observation_only' ? 'Vista abierta' : 'Vacía'));
+        card.append(top, el('div', 'muted', `${ids.length}${r.capacity ? '/' + r.capacity : ''}`), occ);
+        card.onclick = () => { selRoom = r.id; render(); };
+        grid.append(card);
+      }
+      box.append(grid); map.append(box);
+    }
+    const chat = $('chat'); chat.replaceChildren();
+    if (selRoom) {
+      $('roomtitle').textContent = roomName(selRoom);
+      const msgs = snap.history[selRoom] || [];
+      if (!msgs.length) chat.append(el('p', 'muted', 'Sin mensajes todavía.'));
+      for (const m of msgs) { const p = el('p'); p.append(el('span', 'who', nameOf(m.actor) + ': '), document.createTextNode(m.text)); chat.append(p); }
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+
+  function describe(e) {
+    const who = nameOf(e.actor);
+    switch (e.type) {
+      case 'identity.registered': return `Nueva identidad: ${e.payload.display_name}`;
+      case 'identity.revoked': return `Identidad revocada: ${nameOf(e.target)}`;
+      case 'presence.world.joined': return `${who} entró al mundo`;
+      case 'presence.world.left': return `${who} salió del mundo`;
+      case 'presence.room.entered': return `${who} → ${roomName(e.target)}`;
+      case 'presence.room.left': return null;
+      case 'presence.status.changed': return `${who} está ${e.payload.status}${e.payload.note ? ' (' + e.payload.note + ')' : ''}`;
+      case 'social.message.sent': return `${who} en ${roomName(e.target)}: ${e.payload.text}`;
+      default: return e.type;
+    }
+  }
+
+  function feedLine(e) {
+    const line = describe(e);
+    if (!line || e.seq <= lastFeedSeq) return;
+    lastFeedSeq = e.seq;
+    const f = $('feed'); f.prepend(el('div', null, `#${e.seq} ${line}`));
+    while (f.childElementCount > 200) f.lastChild.remove();
+  }
+
+  function apply(e) {
+    if (e.seq <= snap.seq) return feedLine(e);
+    const p = snap.presence;
+    switch (e.type) {
+      case 'identity.registered': snap.entities.push(e.payload); break;
+      case 'identity.revoked': { const x = ent(e.target); if (x) x.status = 'revoked'; break; }
+      case 'presence.world.joined': p[e.actor] = { room: null, status: 'online', note: '', since: e.timestamp }; break;
+      case 'presence.room.entered': p[e.actor] = { ...p[e.actor], room: e.target, since: e.timestamp }; break;
+      case 'presence.room.left': p[e.actor] = { ...p[e.actor], room: null }; break;
+      case 'presence.world.left': delete p[e.actor]; break;
+      case 'presence.status.changed': p[e.actor] = { ...p[e.actor], status: e.payload.status, note: e.payload.note }; break;
+      case 'social.message.sent': (snap.history[e.target] ||= []).push({ seq: e.seq, actor: e.actor, text: e.payload.text, timestamp: e.timestamp }); break;
+    }
+    snap.seq = e.seq;
+    feedLine(e);
+  }
+
+  function connect() {
+    if (es) es.close();
+    // Replay the last events too: they only fill the feed, state already includes them.
+    es = new EventSource('/api/events?since=' + Math.max(0, snap.seq - FEED_BACKLOG));
+    es.onopen = () => { $('live').className = 'dot live'; $('livetxt').textContent = 'en vivo'; };
+    es.onmessage = (m) => { apply(JSON.parse(m.data)); render(); };
+    es.onerror = () => {
+      $('live').className = 'dot down'; $('livetxt').textContent = 'reconectando…';
+      es.close(); setTimeout(() => load().catch(() => setTimeout(connect, 3000)), 3000);
+    };
+  }
+
+  async function load() {
+    const r = await fetch('/api/world', { cache: 'no-store' });
+    snap = await r.json();
+    selRoom = selRoom || snap.world.spawn;
+    render(); connect();
+  }
+
+  async function api(method, path, body) {
+    const r = await fetch(path, { method, headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+                                  body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.message || j.error);
+    return j;
+  }
+
+  $('login').onclick = async () => {
+    key = $('key').value.trim(); $('err').textContent = '';
+    try { me = (await api('GET', '/api/me')).entity; $('me').textContent = `Eres ${me.display_name} · ${me.id}`; $('controls').hidden = false; }
+    catch (e) { me = null; $('controls').hidden = true; $('me').textContent = ''; $('err').textContent = e.message; }
+  };
+
+  document.querySelectorAll('[data-act]').forEach((b) => b.onclick = async () => {
+    $('err').textContent = '';
+    const act = b.dataset.act;
+    const body = act === 'moveSel' ? { type: 'move', room: selRoom }
+      : act === 'status' ? { type: 'status', status: $('status').value, note: $('note').value }
+      : act === 'say' ? { type: 'say', text: $('say').value }
+      : { type: act };
+    try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; }
+    catch (e) { $('err').textContent = e.message; }
+  });
+
+  load().catch((e) => { $('livetxt').textContent = 'sin conexión'; $('live').className = 'dot down'; });
+})();
+</script>
+</body>
+</html>

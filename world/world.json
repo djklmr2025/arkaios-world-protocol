@@ -1,0 +1,33 @@
+{
+  "id": "world:arkaios:alpha",
+  "name": "ARKAIOS Alpha",
+  "spawn": "room:plaza:lobby",
+  "districts": [
+    {
+      "id": "district:plaza",
+      "name": "Plaza central",
+      "rooms": [
+        { "id": "room:plaza:lobby", "name": "Lobby · Padrón Único", "zone": "public_sandbox", "capacity": 50 }
+      ]
+    },
+    {
+      "id": "district:expo",
+      "name": "Expo Empleo Digital",
+      "rooms": [
+        { "id": "room:expo:aspirantes", "name": "Aspirantes", "zone": "public_sandbox", "capacity": 50 },
+        { "id": "room:expo:empresas", "name": "Empresas y reclutadores", "zone": "public_sandbox", "capacity": 50 },
+        { "id": "room:expo:galeria", "name": "Galería (solo observar)", "zone": "observation_only", "capacity": 0 }
+      ]
+    },
+    {
+      "id": "district:taller",
+      "name": "Taller de agentes",
+      "rooms": [
+        { "id": "room:taller:estudio", "name": "Estudio de agentes", "zone": "trusted_collaboration", "capacity": 8 },
+        { "id": "room:taller:biblioteca", "name": "Biblioteca", "zone": "public_sandbox", "capacity": 20 },
+        { "id": "room:taller:consejo", "name": "Sala del Consejo", "zone": "restricted", "capacity": 6,
+          "allow": ["operador", "claude", "elemia"] }
+      ]
+    }
+  ]
+}
