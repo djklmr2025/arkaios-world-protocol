@@ -13,6 +13,7 @@ import argparse
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import re
 from pathlib import Path
 import sys
 import threading
@@ -21,12 +22,15 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from mail import public_view  # noqa: E402
 from state import Rejected  # noqa: E402
 from store import World  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_DEFINITION = HERE / 'world.json'
 CLIENT_HTML = HERE / 'client' / 'index.html'
+ASSETS_DIR = HERE / 'client' / 'assets'
+ASSET_RE = re.compile(r'^/assets/([a-z]{1,20})\.png$')
 LOOPBACK = '127.0.0.1'
 MAX_BODY = 4096
 RATE_WINDOW_S = 10.0
@@ -95,12 +99,23 @@ def make_handler(world: World, port: int):
             url = urlparse(self.path)
             if url.path in ('/', '/index.html'):
                 return self._serve_client()
+            if ASSET_RE.match(url.path):
+                return self._serve_asset(ASSET_RE.match(url.path).group(1))
             if url.path == '/api/world':
                 return self._send_json(HTTPStatus.OK, {'ok': True, **world.snapshot()})
             if url.path == '/api/me':
                 entity = self._auth()
                 if entity:
                     self._send_json(HTTPStatus.OK, {'ok': True, 'entity': entity})
+                return
+            if url.path == '/api/inbox':
+                entity = self._auth()
+                if entity:
+                    try:
+                        since = int(parse_qs(url.query).get('since', ['0'])[0])
+                    except ValueError:
+                        return self._error(HTTPStatus.BAD_REQUEST, 'bad_since', 'since must be an integer')
+                    self._send_json(HTTPStatus.OK, {'ok': True, **world.inbox(entity['id'], since)})
                 return
             if url.path == '/api/events':
                 return self._stream(parse_qs(url.query))
@@ -144,6 +159,19 @@ def make_handler(world: World, port: int):
             self.end_headers()
             self.wfile.write(data)
 
+        def _serve_asset(self, name):
+            path = ASSETS_DIR / f'{name}.png'
+            if not path.is_file():
+                return self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such asset')
+            data = path.read_bytes()
+            self.send_response(HTTPStatus.OK)
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Cache-Control', 'max-age=3600')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.end_headers()
+            self.wfile.write(data)
+
         def _stream(self, query):
             try:
                 seq = int(query.get('since', ['0'])[0])
@@ -161,7 +189,7 @@ def make_handler(world: World, port: int):
                     if not batch:
                         self.wfile.write(b': keep-alive\n\n')
                     for event in batch:
-                        payload = json.dumps(event, ensure_ascii=False)
+                        payload = json.dumps(public_view(event), ensure_ascii=False)
                         self.wfile.write(f'id: {event["seq"]}\ndata: {payload}\n\n'.encode('utf-8'))
                         seq = event['seq']
                     self.wfile.flush()

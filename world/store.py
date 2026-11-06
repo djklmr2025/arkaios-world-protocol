@@ -163,6 +163,10 @@ class World:
         with self.cond:
             return self.state.snapshot()
 
+    def inbox(self, entity_id: str, since: int = 0) -> dict:
+        with self.cond:
+            return self.state.inbox(entity_id, since)
+
     def events_after(self, seq: int, timeout: float) -> list:
         """Events with seq > `seq`; waits up to `timeout` seconds for new ones."""
         with self.cond:

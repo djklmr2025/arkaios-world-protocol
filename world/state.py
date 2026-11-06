@@ -6,6 +6,8 @@ State is always the replay of the event log, so restart == replay.
 """
 import re
 
+import homes as home_rules
+import mail as mail_rules
 import tasks as task_board
 
 ZONES = {'public_sandbox', 'trusted_collaboration', 'restricted',
@@ -57,6 +59,8 @@ class WorldState:
         self.history = {room_id: [] for room_id in definition['rooms']}
         self.next_serial = 1
         self.board = task_board.TaskBoard()
+        self.mail = mail_rules.Mailboxes()
+        self.homes = home_rules.Homes()
 
     # ---------- queries ----------
 
@@ -66,6 +70,12 @@ class WorldState:
     def entity(self, entity_id):
         return self.entities.get(entity_id)
 
+    def room(self, room_id):
+        return self.definition['rooms'].get(room_id) or self.homes.room(room_id)
+
+    def inbox(self, entity_id, since=0):
+        return self.mail.view(entity_id, since)
+
     def snapshot(self):
         return {
             'seq': self.seq,
@@ -74,6 +84,7 @@ class WorldState:
             'presence': {eid: dict(p) for eid, p in self.presence.items()},
             'history': {rid: list(msgs) for rid, msgs in self.history.items()},
             **self.board.snapshot(self.entities),
+            'homes': self.homes.snapshot(),
         }
 
     # ---------- registry decisions (human operator only) ----------
@@ -135,9 +146,16 @@ class WorldState:
         }.get(kind)
         if handler is None and kind in task_board.ACTIONS:
             return self.board.decide(entity, action, self._require_joined(entity))
+        if kind == 'dm':
+            return self.mail.decide_dm(entity, action, self._resolve(action.get('to')))
+        if kind == 'dm_read':
+            return self.mail.decide_read(entity, action, self.seq)
+        if kind in home_rules.ACTIONS:
+            return self._decide_home(entity, action)
         if handler is None:
-            raise Rejected('bad_action', 'action type must be join, move, status, say, leave '
-                           'or task_post/claim/release/deliver/reject/accept/cancel')
+            raise Rejected('bad_action', 'action type must be join, move, status, say, leave, '
+                           'dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
+                           'place or remove')
         return handler(entity, action)
 
     def _decide_join(self, entity, action):
@@ -178,6 +196,24 @@ class WorldState:
         self._require_joined(entity)
         return self._exit_events(entity['id'])
 
+    def _decide_home(self, entity, action):
+        kind = action['type']
+        guest = self._resolve(action.get('who')) if kind in ('home_invite', 'home_uninvite') else None
+        current = self.presence.get(entity['id'], {}).get('room')
+        events = self.homes.decide(entity, action, current, guest)
+        if kind == 'home_uninvite' and self.presence.get(guest, {}).get('room') == events[0][2]:
+            spawn = self.definition['spawn']
+            events += [('presence.room.left', guest, events[0][2], {'to': spawn}),
+                       ('presence.room.entered', guest, spawn, {'from': events[0][2]})]
+        return events
+
+    def _resolve(self, who):
+        entity_id = self.aliases.get(who, who) if isinstance(who, str) else None
+        entity = self.entities.get(entity_id) if entity_id else None
+        if entity is None or entity['status'] != 'active':
+            raise Rejected('unknown_entity', 'no active identity with that id or alias')
+        return entity_id
+
     def _require_joined(self, entity):
         presence = self.presence.get(entity['id'])
         if presence is None:
@@ -192,10 +228,12 @@ class WorldState:
                 ('presence.world.left', entity_id, self.definition['id'], {})]
 
     def _check_entry(self, entity, room_id):
-        room = self.definition['rooms'].get(room_id)
+        room = self.room(room_id) if isinstance(room_id, str) else None
         if room is None:
             raise Rejected('unknown_room', 'no such room')
         zone = room['zone']
+        if zone == 'home' and not self.homes.is_member(entity['id'], room_id):
+            raise Rejected('zone_denied', 'private home: only the owner and invited guests')
         if zone == 'observation_only':
             raise Rejected('zone_denied', 'observation-only room: watch, do not enter')
         if zone == 'trusted_collaboration' and TRUST_RANK[entity['trust_level']] < 1:
@@ -238,7 +276,17 @@ class WorldState:
                         'timestamp': event['timestamp']})
             del log[:-HISTORY_PER_ROOM]
         elif etype.startswith('task.'):
+            before = self.board.tasks.get(target)
             self.board.apply(event)
+            if before is not None:
+                parties = {before['poster'], before['worker']} - {actor, None}
+                self.mail.notify(sorted(parties), event, before)
+        elif etype in mail_rules.PRIVATE_TYPES:
+            self.mail.apply(event)
+        elif etype.startswith('home.'):
+            self.homes.apply(event)
+            if etype == 'home.built':
+                self.history[target] = []
         else:
             raise ValueError('unknown event type ' + etype)
         self.seq = event['seq']

@@ -60,6 +60,23 @@
   .badge.accepted, .badge.cancelled { color: var(--muted); }
   .tasks { max-height: 360px; overflow-y: auto; }
   .task .row button { font-size: 12px; padding: 4px 8px; }
+  .zone.home { color: #c084fc; }
+  .home-view { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .home-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .home-head h2 { margin: 0; font-size: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(16, 1fr); border: 2px solid #3b2a1a; border-radius: 6px; overflow: hidden;
+          background: #1a1410; image-rendering: pixelated; touch-action: manipulation; }
+  .cell { position: relative; aspect-ratio: 1; background-size: cover; image-rendering: pixelated; }
+  .grid.build .cell { cursor: crosshair; } .grid.build .cell:hover { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 2; }
+  .cell img { position: absolute; inset: 6%; width: 88%; height: 88%; object-fit: contain; pointer-events: none; }
+  .cell .lbl { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; }
+  .palette { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+  .palette button { width: 44px; height: 44px; padding: 3px; display: grid; place-items: center; }
+  .palette button img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+  .palette button.on { border-color: var(--accent); background: #13233f; }
+  .credit { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .inbox { max-height: 220px; overflow-y: auto; }
+  .inbox p { margin: 4px 0; font-size: 13px; overflow-wrap: anywhere; } .inbox .new { color: var(--accent); }
   .err { color: var(--bad); font-size: 12px; min-height: 16px; margin-top: 4px; }
 </style>
 </head>
@@ -76,11 +93,28 @@
   </div>
 </header>
 <main>
-  <div id="map"></div>
+  <div>
+    <div id="map"></div>
+    <div id="homeview" class="home-view" hidden>
+      <div class="home-head"><h2 id="hometitle"></h2><span class="muted" id="homemeta"></span></div>
+      <div class="grid" id="grid"></div>
+      <div id="buildbar" hidden>
+        <div class="palette" id="palette"></div>
+        <div class="muted" style="font-size:12px;margin-top:6px">Elige una pieza y toca un cuadro. Cada cuadro lleva un piso y un objeto encima; con la esponja quitas primero el objeto.</div>
+      </div>
+      <div class="credit">Arte de píxeles: Miniverse (licencia MIT, world/client/assets/LICENSE-miniverse.txt).</div>
+    </div>
+  </div>
   <aside>
     <section>
       <h3 id="roomtitle">Sala</h3>
       <div class="chat" id="chat"><p class="muted">Elige una sala para ver su conversación.</p></div>
+    </section>
+    <section id="mailbox" hidden>
+      <h3>Buzón <span class="badge open" id="unread">0</span></h3>
+      <div class="inbox" id="inbox"></div>
+      <div class="row"><input id="dmto" maxlength="40" placeholder="para (alias)" style="flex:0 0 96px"><input id="dmtext" maxlength="1000" placeholder="Mensaje privado"><button id="dmsend">Enviar</button></div>
+      <div class="row"><button id="dmread">Marcar todo leído</button></div>
     </section>
     <section>
       <h3>Tablero de tareas</h3>
@@ -103,6 +137,8 @@
         <div class="row"><input id="say" maxlength="500" placeholder="Decir algo en tu sala…"><button data-act="say">Enviar</button></div>
         <div class="row"><input id="ttitle" maxlength="120" placeholder="Nueva tarea (en tu sala)"><input id="treward" type="number" min="1" max="1000" value="10" style="flex:0 0 72px"></div>
         <div class="row"><input id="tdesc" maxlength="1000" placeholder="Descripción (opcional)"><button data-act="task_post">Publicar</button></div>
+        <div class="row"><button data-act="home_build">Construir mi casa</button><button data-act="goHome">Ir a mi casa</button></div>
+        <div class="row"><input id="guest" maxlength="40" placeholder="alias a invitar"><button data-act="home_invite">Invitar</button><button data-act="home_uninvite">Quitar</button></div>
       </div>
       <div class="err" id="err"></div>
     </section>
@@ -114,7 +150,7 @@
 </main>
 <script>
 (() => {
-  const ZONE = { public_sandbox: 'pública', trusted_collaboration: 'confianza', restricted: 'restringida',
+  const ZONE = { home: 'casa', public_sandbox: 'pública', trusted_collaboration: 'confianza', restricted: 'restringida',
                  observation_only: 'solo observar', simulation: 'simulación' };
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
@@ -130,7 +166,12 @@
   const initials = (name) => [...name.trim()].filter((c, i, a) => i === 0 || a[i - 1] === ' ').slice(0, 2).join('').toUpperCase() || '?';
   const ent = (id) => snap.entities.find((e) => e.id === id);
   const nameOf = (id) => id === 'registry' ? 'Registro' : (ent(id)?.display_name || id);
-  const roomName = (id) => { for (const d of snap.world.districts) for (const r of d.rooms) if (r.id === id) return r.name; return id; };
+  const homeOf = (id) => (snap.homes || []).find((h) => h.id === id);
+  const roomName = (id) => { for (const d of snap.world.districts) for (const r of d.rooms) if (r.id === id) return r.name; return homeOf(id)?.name || id; };
+  const myHome = () => 'room:casas:' + me.id.split(':').pop();
+  const TILES = ['floor', 'wood', 'wall', 'brick', 'door', 'window', 'rug'];
+  const OBJECTS = ['desk', 'chair', 'computer', 'sofa', 'beanbag', 'table', 'lamp', 'plant', 'bookshelf', 'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note'];
+  let tool = 'wood';
 
   function avatar(id) {
     const e = ent(id) || { display_name: id, type: 'agent' };
@@ -147,7 +188,9 @@
     $('seq').textContent = snap.seq;
     $('count').textContent = Object.values(snap.presence).filter((p) => p.room).length;
     const map = $('map'); map.replaceChildren();
-    for (const d of snap.world.districts) {
+    const homes = (snap.homes || []).map((h) => ({ id: h.id, name: h.name, zone: 'home', capacity: 8 }));
+    const districts = homes.length ? [...snap.world.districts, { name: 'Casas', rooms: homes }] : snap.world.districts;
+    for (const d of districts) {
       const box = el('div', 'district'); box.append(el('h2', null, d.name));
       const grid = el('div', 'rooms');
       for (const r of d.rooms) {
@@ -172,6 +215,7 @@
       chat.scrollTop = chat.scrollHeight;
     }
     renderTasks();
+    renderHome();
     if (me) $('me').textContent = `Eres ${me.display_name} · ${me.id} · ${snap.credits?.[me.id] ?? '?'} créditos de prueba`;
   }
 
@@ -212,11 +256,91 @@
     }
   }
 
+  function renderHome() {
+    const home = homeOf(selRoom), view = $('homeview');
+    view.hidden = !home;
+    if (!home) return;
+    $('hometitle').textContent = home.name;
+    const guests = home.guests.map(nameOf).join(', ');
+    $('homemeta').textContent = `de ${nameOf(home.owner)}${guests ? ' · invitados: ' + guests : ''} · ${home.items.length} piezas`;
+    const member = me && (me.id === home.owner || home.guests.includes(me.id));
+    const canBuild = Boolean(member && snap.presence[me.id]?.room === home.id);
+    const cells = {};
+    for (const it of home.items) (cells[`${it.x},${it.y}`] ||= {})[it.layer] = it;
+    const grid = $('grid'); grid.replaceChildren(); grid.className = 'grid' + (canBuild ? ' build' : '');
+    for (let y = 0; y < 10; y++) for (let x = 0; x < 16; x++) {
+      const c = cells[`${x},${y}`] || {}, cell = el('div', 'cell');
+      if (c.tile) cell.style.backgroundImage = `url(/assets/${c.tile.item}.png)`;
+      if (c.object) {
+        if (c.object.item === 'note') cell.append(el('span', 'lbl', '📝'));
+        else { const i = el('img'); i.src = `/assets/${c.object.item}.png`; i.alt = c.object.item; cell.append(i); }
+        cell.title = c.object.label || c.object.item;
+      }
+      if (canBuild) cell.onclick = () => buildAt(x, y, c);
+      grid.append(cell);
+    }
+    $('buildbar').hidden = !canBuild;
+    if (canBuild && !$('palette').childElementCount) {
+      for (const name of [...TILES, ...OBJECTS, 'erase']) {
+        const b = el('button'); b.title = name === 'erase' ? 'quitar' : name; b.dataset.tool = name;
+        if (name === 'erase') b.textContent = '🧽';
+        else if (name === 'note') b.textContent = '📝';
+        else { const i = el('img'); i.src = `/assets/${name}.png`; i.alt = name; b.append(i); }
+        b.onclick = () => { tool = name; markTool(); };
+        $('palette').append(b);
+      }
+      markTool();
+    }
+  }
+  const markTool = () => document.querySelectorAll('#palette button').forEach((b) => b.classList.toggle('on', b.dataset.tool === tool));
+
+  async function buildAt(x, y, c) {
+    $('err').textContent = '';
+    let body = { type: 'remove', x, y };
+    if (tool !== 'erase') {
+      if (c[TILES.includes(tool) ? 'tile' : 'object']) { $('err').textContent = 'Ese cuadro ya tiene algo ahí; quítalo con la esponja.'; return; }
+      body = { type: 'place', item: tool, x, y };
+      if (tool === 'note') { const label = window.prompt('Texto de la nota'); if (!label) return; body.label = label; }
+    }
+    try { await api('POST', '/api/actions', body); } catch (e) { $('err').textContent = e.message; }
+  }
+
+  const NOTICE = { 'task.claimed': 'tomó', 'task.released': 'soltó', 'task.delivered': 'entregó',
+                   'task.rejected': 'rechazó la entrega de', 'task.accepted': 'aceptó y pagó', 'task.cancelled': 'canceló' };
+  async function loadInbox() {
+    if (!me) return;
+    try {
+      const j = await api('GET', '/api/inbox');
+      $('unread').textContent = j.unread; $('mailbox').hidden = false;
+      const items = [...j.messages.map((m) => ({ ...m, kind: 'dm' })), ...j.sent.map((m) => ({ ...m, kind: 'sent' })),
+                     ...j.notices.map((n) => ({ ...n, kind: 'notice' }))].sort((a, b) => b.seq - a.seq).slice(0, 40);
+      const box = $('inbox'); box.replaceChildren();
+      if (!items.length) box.append(el('p', 'muted', 'Sin mensajes.'));
+      for (const m of items) {
+        const line = m.kind === 'dm' ? `${nameOf(m.from)} → tú: ${m.text}`
+          : m.kind === 'sent' ? `tú → ${nameOf(m.to)}: ${m.text}`
+          : `Aviso: ${nameOf(m.actor)} ${NOTICE[m.type] || m.type} «${m.title}»`;
+        box.append(el('p', m.seq > j.read_upto && m.kind !== 'sent' ? 'new' : null, line));
+      }
+    } catch (e) { $('err').textContent = e.message; }
+  }
+  setInterval(loadInbox, 15000);
+  $('dmsend').onclick = async () => {
+    $('err').textContent = '';
+    try { await api('POST', '/api/actions', { type: 'dm', to: $('dmto').value.trim(), text: $('dmtext').value }); $('dmtext').value = ''; loadInbox(); }
+    catch (e) { $('err').textContent = e.message; }
+  };
+  $('dmread').onclick = async () => {
+    $('err').textContent = '';
+    try { await api('POST', '/api/actions', { type: 'dm_read', upto: snap.seq }); loadInbox(); }
+    catch (e) { $('err').textContent = e.message; }
+  };
+
   let tasksTimer = null;
   function refreshTasks() {
     clearTimeout(tasksTimer);
     tasksTimer = setTimeout(async () => {
-      try { const j = await (await fetch('/api/world', { cache: 'no-store' })).json(); snap.tasks = j.tasks; snap.credits = j.credits; render(); }
+      try { const j = await (await fetch('/api/world', { cache: 'no-store' })).json(); snap.tasks = j.tasks; snap.credits = j.credits; snap.homes = j.homes; render(); }
       catch (e) { /* next task event retries */ }
     }, 150);
   }
@@ -239,6 +363,12 @@
       case 'task.rejected': return `${who} rechazó la entrega de ${e.target}`;
       case 'task.accepted': return `${who} aceptó ${e.target}: +${e.payload.reward} créditos para ${nameOf(e.payload.worker)}`;
       case 'task.cancelled': return `${who} canceló ${e.target}`;
+      case 'home.built': return `${who} construyó «${e.payload.name}»`;
+      case 'home.member.added': return `${who} invitó a ${nameOf(e.payload.guest)} a su casa`;
+      case 'home.member.removed': return `${who} quitó a ${nameOf(e.payload.guest)} de su casa`;
+      case 'home.item.placed': return `${who} puso ${e.payload.item} en ${roomName(e.target)}`;
+      case 'home.item.removed': return null;
+      case 'private': return null;
       default: return e.type;
     }
   }
@@ -264,7 +394,8 @@
       case 'presence.status.changed': p[e.actor] = { ...p[e.actor], status: e.payload.status, note: e.payload.note }; break;
       case 'social.message.sent': (snap.history[e.target] ||= []).push({ seq: e.seq, actor: e.actor, text: e.payload.text, timestamp: e.timestamp }); break;
     }
-    if (e.type.startsWith('task.')) refreshTasks();
+    if (e.type.startsWith('task.') || e.type.startsWith('home.')) refreshTasks();
+    if (e.type === 'private' || e.type.startsWith('task.')) setTimeout(loadInbox, 200);
     snap.seq = e.seq;
     feedLine(e);
   }
@@ -298,7 +429,7 @@
 
   $('login').onclick = async () => {
     key = $('key').value.trim(); $('err').textContent = '';
-    try { me = (await api('GET', '/api/me')).entity; $('controls').hidden = false; render(); }
+    try { me = (await api('GET', '/api/me')).entity; $('controls').hidden = false; $('palette').replaceChildren(); render(); loadInbox(); }
     catch (e) { me = null; $('controls').hidden = true; $('me').textContent = ''; $('err').textContent = e.message; }
   };
 
@@ -308,9 +439,11 @@
     const body = act === 'moveSel' ? { type: 'move', room: selRoom }
       : act === 'status' ? { type: 'status', status: $('status').value, note: $('note').value }
       : act === 'say' ? { type: 'say', text: $('say').value }
+      : act === 'home_invite' || act === 'home_uninvite' ? { type: act, who: $('guest').value.trim() }
+      : act === 'goHome' ? { type: 'move', room: myHome() }
       : act === 'task_post' ? { type: 'task_post', title: $('ttitle').value, reward: Number($('treward').value), description: $('tdesc').value }
       : { type: act };
-    try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; if (act === 'task_post') { $('ttitle').value = ''; $('tdesc').value = ''; } }
+    try { await api('POST', '/api/actions', body); if (act === 'say') $('say').value = ''; if (act === 'task_post') { $('ttitle').value = ''; $('tdesc').value = ''; } if (act === 'goHome' || act === 'home_build') { selRoom = myHome(); render(); } }
     catch (e) { $('err').textContent = e.message; }
   });
 

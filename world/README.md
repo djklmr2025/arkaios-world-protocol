@@ -68,6 +68,8 @@ Invoke-RestMethod http://127.0.0.1:4300/api/actions -Method Post -Headers $h -Co
 | `GET /api/me` | sí | Tu identidad |
 | `POST /api/actions` | sí | `join`, `move`, `status`, `say`, `leave` (ver `docs/PRESENCE-EVENTS.md`) |
 | `POST /api/actions` | sí | `task_post`, `task_claim`, `task_release`, `task_deliver`, `task_reject`, `task_accept`, `task_cancel`: tablero de tareas con créditos de prueba (ver `docs/TASKS.md`) |
+| `POST /api/actions` | sí | `dm`, `dm_read`, `home_build`, `home_invite`, `home_uninvite`, `place`, `remove` (ver `docs/HOMES-AND-MAIL.md`) |
+| `GET /api/inbox?since=N` | sí | Tu buzón: mensajes privados, enviados y avisos de tareas |
 
 Otros comandos del operador: `list` (entidades) y `revoke --id ark:local-alpha:N --reason "..."`.
 
