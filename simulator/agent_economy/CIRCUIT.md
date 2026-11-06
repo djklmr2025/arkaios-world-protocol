@@ -10,7 +10,7 @@ El render y cobro siguen siendo locales, con consulta ELEMIA remota opcional ant
 
 ## Dependencias y fuente
 
-Python 3.11+; requirements-circuit.txt registra las versiones usadas en Linux. Windows no se ejecutó aquí.
+Python 3.11+; requirements-circuit.txt registra las versiones usadas en Linux. El 2026-11-05 se ejecutó también en Windows 11 con Python 3.11.16 y esas mismas versiones (19 OK sin omisiones; ver docs/RUN-PILOT.md).
 
 Usar una copia separada del estudio y fijar su commit sin transformar finales de línea (los hashes son por bytes exactos):
 

@@ -65,3 +65,14 @@ Todo opera con unidades de prueba y HTTP en loopback. No usa credenciales, Moltb
 ### Estado de CI de esta publicación
 
 [La primera ejecución](https://github.com/djklmr2025/arkaios-world-protocol/actions/runs/39200227489) no inició ningún paso en Ubuntu ni Windows. GitHub informó: `The job was not started because your account is locked due to a billing issue.` Por tanto, no hay resultado de tests remotos y Windows continúa sin validarse. Las 35 pruebas locales Linux indicadas arriba sí se ejecutaron. Resolver la facturación corresponde al titular de la cuenta; después se podrá volver a ejecutar el workflow desde Actions.
+
+### Validación local en Windows 11 (2026-11-05)
+
+Ejecutada a mano en Windows 11 Pro 10.0.26300, Python 3.11.16, dependencias exactas de `requirements-circuit.txt` y estudio fijado en `2803142d68ff21baa595f63b254eeeb89c4c1e20` con `core.autocrlf=false`:
+
+- `simulator/agent_economy`: 19 pruebas OK, sin omisiones (`MUSIC_STUDIO_ROOT` definido).
+- `testnet`: 14 pruebas OK.
+- `test_pilot`: 2 pruebas OK.
+- `run_pilot.py` dos veces seguidas: `4/4 PASS` en ambas; el informe conserva comprador 750 / prestador 250, 1000 AMR_TEST emitidos, 350 inmovilizados, 350 TOKEN_TEST, 4 bloques y `audio_sha256` `03c2b16d…b657c`. La segunda ejecución no emitió ni pagó de nuevo.
+
+Ese equipo no tenía el lanzador `py`, así que `run_pilot.cmd` no se usó: el entorno se creó con `uv venv --python 3.11 .venv-pilot` y se ejecutaron los mismos comandos manuales. Sigue sin haber resultado de CI remoto; esta es una ejecución local bajo control del mismo operador.

@@ -53,7 +53,7 @@ Anclar el WAV generado por el circuito anterior:
 .\.venv\Scripts\python.exe network.py --state .local-state --artifact ..\simulator\agent_economy\.local-state\artifacts\render-001\delivery.wav
 ```
 
-En Linux usar python3 y .venv/bin/python. Las pruebas se ejecutaron en Linux; Windows no se ejecutó.
+En Linux usar python3 y .venv/bin/python. Las pruebas se ejecutaron en Linux y, el 2026-11-05, en Windows 11 con Python 3.11.16 (14 OK; ver docs/RUN-PILOT.md).
 
 La demo inicia los cuatro nodos, procesa o verifica el estado y los detiene al terminar. No instala servicios ni deja daemons corriendo. Repetirla con el mismo directorio conserva claves y estado y no vuelve a emitir. --artifact ancla hash bajo el agente de prueba prestador, no certifica por sí solo autoría, licencia, calidad ni pago del archivo. El WAV se validó en el circuito anterior; la red solo registra su huella.
 
