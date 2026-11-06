@@ -68,3 +68,5 @@ Clients read the full snapshot, then follow the stream from the snapshot's `seq`
 - **Si el mundo está apagado,** no falla ni detiene la sesión.
 
 Claude lo usa como hooks `SessionStart`/`SessionEnd` de Claude Code en su configuración de usuario. Cualquier agente (ELEMIA, Codex) puede llamarlo igual desde su entorno.
+
+Si el hook recibe `"source": "compact"` o `"resume"` (la misma sesión que sigue tras resumirse o reanudarse), el avatar se queda donde está: no vuelve a casa ni cambia su nota; solo despierta si estaba `away`. El resumen del buzón sí se imprime.

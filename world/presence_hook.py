@@ -21,6 +21,8 @@ WORLD = os.environ.get('ARKAIOS_WORLD_URL', 'http://127.0.0.1:4300')
 TIMEOUT_S = 3
 SESSION_TTL_S = 12 * 3600
 SEAT_ORDER = ('chair', 'sofa', 'beanbag')
+# A compacted or resumed session is the same work going on: stay where the avatar is.
+STAY_SOURCES = frozenset({'compact', 'resume'})
 
 
 def read_key(agent: str) -> str:
@@ -81,23 +83,33 @@ def find_seat(home: dict):
     return seats[0] if seats else None
 
 
-def wake(client: Client, me: dict, world: dict) -> str:
+def wake(client: Client, me: dict, world: dict, stay: bool = False) -> str:
     my_id = me['id']
     home_id = f"room:casas:{my_id.rsplit(':', 1)[1]}"
     home = next((h for h in world.get('homes', []) if h['id'] == home_id), None)
     presence = world.get('presence', {}).get(my_id)
-    if presence is None:
-        client.act(type='join', room=home_id if home else world['world']['spawn'])
-    elif home and presence['room'] != home_id:
-        client.act(type='move', room=home_id)
-    seat = find_seat(home) if home else None
-    if seat:
-        client.act(type='walk', x=seat['x'], y=seat['y'])
-    client.act(type='status', status='busy', mood='working', note='en sesión')
-    client.act(type='emote', emote='wave')
+    if stay and presence is not None:
+        if presence.get('status') == 'away':
+            client.act(type='status', status='busy', mood='working', note='en sesión')
+    else:
+        if presence is None:
+            client.act(type='join', room=home_id if home else world['world']['spawn'])
+        elif home and presence['room'] != home_id:
+            client.act(type='move', room=home_id)
+        seat = find_seat(home) if home else None
+        if seat:
+            client.act(type='walk', x=seat['x'], y=seat['y'])
+        client.act(type='status', status='busy', mood='working', note='en sesión')
+        client.act(type='emote', emote='wave')
     inbox = client.call('GET', '/api/inbox')
-    lines = [f"ARKAIOS World: {me['display_name']} despertó"
-             f"{' en ' + home['name'] if home else ''} ({WORLD})."]
+    if stay and presence is not None:
+        rooms = {r['id']: r['name'] for d in world['world']['districts'] for r in d['rooms']}
+        rooms.update({h['id']: h['name'] for h in world.get('homes', [])})
+        where = rooms.get(presence['room'], presence['room'])
+        lines = [f"ARKAIOS World: {me['display_name']} sigue en {where} ({WORLD})."]
+    else:
+        lines = [f"ARKAIOS World: {me['display_name']} despertó"
+                 f"{' en ' + home['name'] if home else ''} ({WORLD})."]
     unread = inbox.get('unread', 0)
     pending = [m for m in inbox.get('messages', []) + inbox.get('notices', [])
                if m['seq'] > inbox.get('read_upto', 0)]
@@ -134,12 +146,14 @@ def main(argv=None) -> int:
     parser.add_argument('--agent', required=True)
     parser.add_argument('event', choices=['start', 'end'])
     args = parser.parse_args(argv)
-    session_id = 'manual'
+    hook = {}
     if not sys.stdin.isatty():
         try:
-            session_id = str(json.loads(sys.stdin.read() or '{}').get('session_id') or 'manual')
+            hook = json.loads(sys.stdin.read() or '{}')
         except ValueError:
-            pass
+            hook = {}
+    session_id = str(hook.get('session_id') or 'manual')
+    stay = hook.get('source') in STAY_SOURCES
     key = read_key(args.agent)
     if not key:
         return 0
@@ -151,10 +165,10 @@ def main(argv=None) -> int:
         remaining = update_sessions(args.agent, session_id, args.event == 'start')
         world = client.call('GET', '/api/world')
         if args.event == 'start':
-            sys.stdout.write(wake(client, me, world) + '\n')
+            sys.stdout.write(wake(client, me, world, stay) + '\n')
         elif remaining == 0:
             sleep(client, me, world)
-    except (OSError, ValueError, KeyError):
+    except Exception:  # noqa: BLE001 - a hook must never break the session
         return 0
     return 0
 
