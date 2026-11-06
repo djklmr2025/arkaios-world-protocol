@@ -61,6 +61,16 @@
   .tasks { max-height: 360px; overflow-y: auto; }
   .task .row button { font-size: 12px; padding: 4px 8px; }
   .zone.home { color: #c084fc; }
+  .av.sprite { background-color: #1e2a47; background-size: 400% 400%; background-position: 0 100%;
+               image-rendering: pixelated; border-radius: 9px; color: transparent; }
+  .grid { position: relative; }
+  .citizen { position: absolute; width: calc(100% / 16 * 1.6); aspect-ratio: 1; transform: translate(-19%, -45%);
+             background-size: 400% 400%; image-rendering: pixelated; pointer-events: none; z-index: 3;
+             animation: frames var(--speed, .9s) steps(var(--steps, 4)) infinite; }
+  .citizen .tag { position: absolute; left: 50%; bottom: -14%; transform: translateX(-50%); white-space: nowrap;
+                  font-size: 10px; font-weight: 700; padding: 0 5px; border-radius: 6px; background: rgba(11,16,32,.85); color: #fff; }
+  @keyframes frames { from { background-position-x: 0%; } to { background-position-x: var(--end, 133.333%); } }
+  @media (prefers-reduced-motion: reduce) { .citizen { animation: none; } }
   .home-view { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
   .home-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .home-head h2 { margin: 0; font-size: 16px; }
@@ -102,7 +112,7 @@
         <div class="palette" id="palette"></div>
         <div class="muted" style="font-size:12px;margin-top:6px">Elige una pieza y toca un cuadro. Cada cuadro lleva un piso y un objeto encima; con la esponja quitas primero el objeto.</div>
       </div>
-      <div class="credit">Arte de píxeles: Miniverse (licencia MIT, world/client/assets/LICENSE-miniverse.txt).</div>
+      <div class="credit">Arte de píxeles y personajes: Miniverse (licencia MIT, world/client/assets/LICENSE-miniverse.txt).</div>
     </div>
   </div>
   <aside>
@@ -173,11 +183,17 @@
   const OBJECTS = ['desk', 'chair', 'computer', 'sofa', 'beanbag', 'table', 'lamp', 'plant', 'bookshelf', 'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note'];
   let tool = 'wood';
 
+  const CHARACTERS = ['dexter', 'nova', 'morty', 'rio'];
+  const character = (id) => CHARACTERS[((Number(id.split(':').pop()) || hue(id)) - 1 + CHARACTERS.length) % CHARACTERS.length];
+  // Sheet rows (Miniverse layout, 4x4 frames of 64px): actions 0 working, 1 sleeping, 2 talking, 3 idle.
+  const POSE = { busy: { row: 0, steps: 4, speed: '.9s' }, away: { row: 1, steps: 2, speed: '1.6s' },
+                 online: { row: 3, steps: 4, speed: '1.4s' } };
+
   function avatar(id) {
     const e = ent(id) || { display_name: id, type: 'agent' };
     const p = snap.presence[id] || {};
-    const a = el('div', 'av ' + e.type, initials(e.display_name));
-    a.style.background = `hsl(${hue(id)} 70% 65%)`;
+    const a = el('div', 'av sprite ' + e.type, initials(e.display_name));
+    a.style.backgroundImage = `url(/assets/${character(id)}_actions.png)`;
     a.title = `${e.display_name} (${e.type}, ${e.trust_level || '?'})${p.note ? ' — ' + p.note : ''}`;
     a.append(el('span', 'st ' + (p.status || 'online')));
     return a;
@@ -279,6 +295,7 @@
       if (canBuild) cell.onclick = () => buildAt(x, y, c);
       grid.append(cell);
     }
+    placeCitizens(home, cells, grid);
     $('buildbar').hidden = !canBuild;
     if (canBuild && !$('palette').childElementCount) {
       for (const name of [...TILES, ...OBJECTS, 'erase']) {
@@ -290,6 +307,35 @@
         $('palette').append(b);
       }
       markTool();
+    }
+  }
+  function placeCitizens(home, cells, grid) {
+    const inside = Object.entries(snap.presence).filter(([, p]) => p.room === home.id).map(([id]) => id)
+      .sort((a, b) => (a === home.owner ? -1 : b === home.owner ? 1 : a.localeCompare(b)));
+    const blocked = new Set(['wall', 'brick', 'window', 'door']);
+    const free = [];
+    for (let y = 1; y < 9; y++) for (let x = 1; x < 15; x++) {
+      const c = cells[`${x},${y}`] || {};
+      if (!c.object && !(c.tile && blocked.has(c.tile.item))) free.push([x, y]);
+    }
+    free.sort((a, b) => Math.hypot(a[0] - 7.5, a[1] - 5) - Math.hypot(b[0] - 7.5, b[1] - 5));
+    const chair = home.items.find((it) => it.layer === 'object' && it.item === 'chair');
+    for (const id of inside) {
+      const status = snap.presence[id].status || 'online';
+      let spot = null, pose = POSE[status] || POSE.online;
+      if (id === home.owner && chair && status !== 'away') { spot = [chair.x, chair.y]; pose = POSE.busy; }
+      else spot = free.shift();
+      if (!spot) continue;
+      const c = el('div', 'citizen');
+      c.style.left = `${spot[0] / 16 * 100}%`; c.style.top = `${spot[1] / 10 * 100}%`;
+      c.style.backgroundImage = `url(/assets/${character(id)}_actions.png)`;
+      c.style.backgroundPositionY = `${pose.row * 100 / 3}%`;
+      c.style.setProperty('--steps', pose.steps);
+      c.style.setProperty('--end', `${pose.steps * 100 / 3}%`);
+      c.style.setProperty('--speed', pose.speed);
+      c.append(el('span', 'tag', nameOf(id)));
+      c.title = `${nameOf(id)} · ${status}${snap.presence[id].note ? ' — ' + snap.presence[id].note : ''}`;
+      grid.append(c);
     }
   }
   const markTool = () => document.querySelectorAll('#palette button').forEach((b) => b.classList.toggle('on', b.dataset.tool === tool));
