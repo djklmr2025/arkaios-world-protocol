@@ -1,9 +1,8 @@
 name: Local pilot verification
 
+# Manual only while GitHub Actions is blocked on this account (see docs/RUN-PILOT.md).
+# To restore automatic runs, add back: push: { branches: [main] } and pull_request:
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:

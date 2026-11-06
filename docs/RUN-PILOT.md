@@ -76,3 +76,5 @@ Ejecutada a mano en Windows 11 Pro 10.0.26300, Python 3.11.16, dependencias exac
 - `run_pilot.py` dos veces seguidas: `4/4 PASS` en ambas; el informe conserva comprador 750 / prestador 250, 1000 AMR_TEST emitidos, 350 inmovilizados, 350 TOKEN_TEST, 4 bloques y `audio_sha256` `03c2b16d…b657c`. La segunda ejecución no emitió ni pagó de nuevo.
 
 Ese equipo no tenía el lanzador `py`, así que `run_pilot.cmd` no se usó: el entorno se creó con `uv venv --python 3.11 .venv-pilot` y se ejecutaron los mismos comandos manuales. Sigue sin haber resultado de CI remoto; esta es una ejecución local bajo control del mismo operador.
+
+El reintento del 2026-11-05 (intento 2) volvió a fallar con el mismo mensaje de facturación. Mientras se resuelve con soporte de GitHub, `Local pilot verification` quedó en modo manual (solo `workflow_dispatch`), para no marcar ❌ cada push. Para reactivar las ejecuciones automáticas, volver a agregar `push` a `main` y `pull_request` en `.github/workflows/pilot-tests.yml`.
