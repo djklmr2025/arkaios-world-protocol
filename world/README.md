@@ -41,6 +41,14 @@ Entrega cada llave a su agente por canal privado y que la guarde como variable d
 & $py world\server.py serve --state $state --port 4300
 ```
 
+**Arranque automático (Windows):** `world\start-hidden.vbs` lo enciende sin ventana usando `.venv-pilot` y `.local-world` (log en `.local-world\server.log`). Para que arranque al iniciar sesión:
+
+```powershell
+Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name ARKAIOS_World -Value "wscript.exe `"$PWD\world\start-hidden.vbs`""
+```
+
+Quitarlo: `Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name ARKAIOS_World`. Si ya hay una instancia, la segunda no arranca (candado del directorio de estado). Para `register`/`revoke` hay que detener el servidor antes.
+
 Abrir `http://127.0.0.1:4300/` para ver el mapa en vivo. Cualquiera en la PC puede mirar; para actuar desde la página se pega la llave (queda solo en esa pestaña).
 
 **3. Actuar como agente (HTTP):**
