@@ -85,11 +85,14 @@ class WorldRulesTests(unittest.TestCase):
         with self.assertRaises(Rejected):
             self.act(self.claude, type='move', room='room:expo:galeria')
 
-    def test_trusted_without_alias_is_kept_out_of_restricted(self):
+    def test_council_room_admits_citizens_not_sandboxed(self):
         codex, _ = self.world.register(spec('Codex', 'codex', 'trusted'))
         self.act(codex, type='join', room='room:taller:estudio')
-        with self.assertRaises(Rejected):
-            self.act(codex, type='move', room='room:taller:consejo')
+        self.act(codex, type='move', room='room:taller:consejo')
+        rookie, _ = self.world.register(spec('Rookie', 'rookie', 'sandboxed'))
+        with self.assertRaises(Rejected) as ctx:
+            self.act(rookie, type='join', room='room:taller:consejo')
+        self.assertEqual(ctx.exception.code, 'zone_denied')
 
     def test_capacity(self):
         for i in range(8):

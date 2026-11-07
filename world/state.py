@@ -6,6 +6,7 @@ State is always the replay of the event log, so restart == replay.
 """
 import re
 
+import governance as gov_rules
 import homes as home_rules
 import mail as mail_rules
 import movement
@@ -66,6 +67,7 @@ class WorldState:
         self.board = task_board.TaskBoard()
         self.mail = mail_rules.Mailboxes()
         self.homes = home_rules.Homes()
+        self.council = gov_rules.Council()
         self.scenes = {rid: movement.public_scene(room) for rid, room in definition['rooms'].items()}
 
     # ---------- queries ----------
@@ -94,6 +96,7 @@ class WorldState:
             'history': {rid: list(msgs) for rid, msgs in self.history.items()},
             **self.board.snapshot(self.entities),
             'homes': self.homes.snapshot(),
+            **self.council.snapshot(self.entities),
             'scenes': {rid: movement.scene_items(sc) for rid, sc in self.scenes.items()},
         }
 
@@ -149,6 +152,15 @@ class WorldState:
         if entity is None or entity['status'] != 'active':
             raise Rejected('inactive', 'entity is not active')
         kind = action.get('type')
+        if kind == 'emergency':
+            return self.council.decide_emergency(entity, action)
+        if kind != 'leave' and not self.council.in_good_standing(actor_id):
+            raise Rejected('sanctioned', 'the council has ' + self.council.standing[actor_id] + ' you')
+        if kind != 'leave' and self.council.frozen and entity['type'] != 'human':
+            raise Rejected('world_frozen', 'the operator froze the world (emergency); only leave works')
+        if kind in gov_rules.ACTIONS:
+            return self.council.decide(entity, action, self._require_joined(entity),
+                                       self.entities, self._resolve)
         handler = {
             'join': self._decide_join, 'move': self._decide_move,
             'status': self._decide_status, 'say': self._decide_say,
@@ -166,7 +178,7 @@ class WorldState:
         if handler is None:
             raise Rejected('bad_action', 'action type must be join, move, status, say, leave, '
                            'emote, walk, knock, dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
-                           'place or remove')
+                           'place, remove, propose, vote or withdraw')
         return handler(entity, action)
 
     def _decide_join(self, entity, action):
@@ -273,7 +285,10 @@ class WorldState:
             raise Rejected('zone_denied', 'observation-only room: watch, do not enter')
         if zone == 'trusted_collaboration' and TRUST_RANK[entity['trust_level']] < 1:
             raise Rejected('zone_denied', 'requires trust level trusted or core')
-        if zone in ('restricted', 'simulation') and not set(entity['aliases']) & set(room['allow']):
+        if room.get('council'):
+            if not self.council.can_enter(entity):
+                raise Rejected('zone_denied', 'the council room is for citizen agents (and human core observers)')
+        elif zone in ('restricted', 'simulation') and not set(entity['aliases']) & set(room['allow']):
             raise Rejected('zone_denied', 'not on this room\'s allow list')
         if len(self.occupants(room_id)) >= room['capacity']:
             raise Rejected('room_full', 'room is at capacity')
@@ -318,6 +333,8 @@ class WorldState:
         elif etype.startswith('task.'):
             before = self.board.tasks.get(target)
             self.board.apply(event)
+            if etype == 'task.accepted':
+                self.council.on_task_accepted(before)
             if before is not None:
                 parties = {before['poster'], before['worker']} - {actor, None}
                 self.mail.notify(sorted(parties), event, before)
@@ -326,6 +343,8 @@ class WorldState:
         elif etype == 'home.knocked':
             home = self.homes.homes[target]
             self.mail.notify([home['owner']], event, {'id': target, 'title': home['name']})
+        elif etype.startswith('gov.'):
+            self._apply_gov(event)
         elif etype.startswith('home.'):
             self.homes.apply(event)
             if etype == 'home.built':
@@ -333,3 +352,17 @@ class WorldState:
         else:
             raise ValueError('unknown event type ' + etype)
         self.seq = event['seq']
+
+    def _apply_gov(self, event):
+        self.council.apply(event)
+        etype, actor, target = event['type'], event['actor'], event['target']
+        proposal = self.council.proposals.get(target)
+        if proposal is None:
+            return
+        ref = {'id': target, 'title': proposal['title']}
+        if etype == 'gov.proposal.opened':
+            self.mail.notify([e for e in proposal['electorate'] if e != actor], event, ref)
+        elif etype in ('gov.proposal.passed', 'gov.proposal.rejected'):
+            self.mail.notify(sorted({proposal['author'], proposal['target']} - {None}), event, ref)
+            if etype == 'gov.proposal.passed' and proposal['level'] in ('suspend', 'expel'):
+                self.presence.pop(proposal['target'], None)

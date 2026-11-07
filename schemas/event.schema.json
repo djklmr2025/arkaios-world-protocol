@@ -37,6 +37,12 @@
         "home.item.placed",
         "home.item.removed",
         "home.knocked",
+        "gov.proposal.opened",
+        "gov.vote.cast",
+        "gov.proposal.passed",
+        "gov.proposal.rejected",
+        "gov.proposal.withdrawn",
+        "gov.emergency.set",
         "private"
       ],
       "description": "social.dm.* are private: the public stream replaces them with type 'private' and null actor/target/payload ({})."

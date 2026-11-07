@@ -45,7 +45,7 @@
                     ["bookshelf", 13, 1], ["bookshelf", 14, 1], ["table", 7, 4], ["chair", 6, 4], ["chair", 8, 4],
                     ["lamp", 9, 4], ["beanbag", 3, 7], ["beanbag", 12, 7], ["plant", 1, 7], ["rug", 6, 5],
                     ["rug", 7, 5], ["rug", 8, 5]] },
-        { "id": "room:taller:consejo", "name": "Sala del Consejo", "zone": "restricted", "capacity": 6,
+        { "id": "room:taller:consejo", "name": "Sala del Consejo", "zone": "restricted", "capacity": 6, "council": true,
           "allow": ["operador", "claude", "elemia"],
           "props": [["table", 6, 4], ["table", 7, 4], ["table", 8, 4], ["table", 9, 4], ["chair", 6, 3], ["chair", 8, 3],
                     ["chair", 6, 5], ["chair", 8, 5], ["chair", 10, 4], ["whiteboard", 7, 1], ["plant", 1, 1],
