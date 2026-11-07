@@ -51,6 +51,34 @@
                     ["chair", 6, 5], ["chair", 8, 5], ["chair", 10, 4], ["whiteboard", 7, 1], ["plant", 1, 1],
                     ["plant", 14, 1], ["lamp", 14, 7]] }
       ]
+    },
+    {
+      "id": "district:ocio",
+      "name": "Barrio del Ocio",
+      "floor": "wood",
+      "rooms": [
+        { "id": "room:ocio:cafe", "name": "Café La Pausa", "zone": "public_sandbox", "capacity": 20,
+          "props": [["coffee", 1, 1], ["coffee", 2, 1], ["fridge", 3, 1], ["shelf", 5, 1], ["art", 7, 0], ["art", 8, 0],
+                    ["lamp", 13, 1], ["cooler", 14, 1], ["table", 3, 4], ["chair", 2, 4], ["chair", 4, 4],
+                    ["table", 11, 4], ["chair", 10, 4], ["chair", 12, 4], ["table", 5, 6], ["chair", 4, 6],
+                    ["chair", 6, 6], ["table", 11, 6], ["chair", 10, 6], ["chair", 12, 6], ["speaker", 14, 4],
+                    ["plant", 1, 7], ["plant", 14, 7], ["rug", 7, 5], ["rug", 8, 5]] },
+        { "id": "room:ocio:mirador", "name": "Mirador de las estrellas", "zone": "public_sandbox", "capacity": 20,
+          "props": [["window", 1, 0], ["window", 2, 0], ["window", 5, 0], ["window", 6, 0], ["window", 7, 0],
+                    ["window", 8, 0], ["window", 9, 0], ["window", 10, 0], ["window", 13, 0], ["window", 14, 0],
+                    ["window", 0, 3], ["window", 0, 4], ["window", 15, 3], ["window", 15, 4],
+                    ["beanbag", 2, 2], ["beanbag", 4, 2], ["beanbag", 6, 2], ["beanbag", 9, 2], ["beanbag", 11, 2],
+                    ["beanbag", 13, 2], ["rug", 5, 3], ["rug", 6, 3], ["rug", 7, 3], ["rug", 8, 3], ["rug", 9, 3],
+                    ["rug", 10, 3], ["sofa", 3, 5], ["sofa", 12, 5], ["lamp", 1, 1], ["lamp", 14, 1],
+                    ["whiteboard", 1, 5], ["bookshelf", 14, 5], ["plant", 1, 7], ["plant", 14, 7]] },
+        { "id": "room:ocio:pista", "name": "Pista y música", "zone": "public_sandbox", "capacity": 30,
+          "props": [["speaker", 1, 1], ["speaker", 14, 1], ["speaker", 1, 6], ["speaker", 14, 6], ["lamp", 4, 1],
+                    ["lamp", 11, 1], ["art", 7, 0], ["art", 8, 0], ["rug", 5, 3], ["rug", 6, 3], ["rug", 7, 3],
+                    ["rug", 8, 3], ["rug", 9, 3], ["rug", 10, 3], ["rug", 5, 4], ["rug", 6, 4], ["rug", 7, 4],
+                    ["rug", 8, 4], ["rug", 9, 4], ["rug", 10, 4], ["rug", 5, 5], ["rug", 6, 5], ["rug", 7, 5],
+                    ["rug", 8, 5], ["rug", 9, 5], ["rug", 10, 5], ["beanbag", 3, 3], ["beanbag", 12, 3],
+                    ["cooler", 1, 4], ["sofa", 2, 7], ["sofa", 13, 7], ["plant", 4, 7], ["plant", 11, 7]] }
+      ]
     }
   ]
 }
