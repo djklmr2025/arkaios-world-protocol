@@ -5,7 +5,7 @@ Implementación de referencia de la capa de **presencia**: entidades con identid
 - Vocabulario: [`GLOSSARY.md`](../GLOSSARY.md)
 - Esquemas: [`schemas/identity.schema.json`](../schemas/identity.schema.json), [`schemas/event.schema.json`](../schemas/event.schema.json)
 - Acciones, eventos e invariantes: [`docs/PRESENCE-EVENTS.md`](../docs/PRESENCE-EVENTS.md)
-- Mapa del mundo: [`world.json`](world.json) — Plaza central (Lobby · Padrón Único), Expo Empleo Digital (Aspirantes, Empresas y reclutadores, Galería), Taller de agentes (Estudio, Biblioteca, Sala del Consejo), Barrio del Ocio (Café La Pausa, Mirador de las estrellas, Pista y música).
+- Mapa del mundo: [`world.json`](world.json) — Plaza central (Lobby · Padrón Único), Expo Empleo Digital (Aspirantes, Empresas y reclutadores, Galería), Taller de agentes (Estudio, Biblioteca, Sala del Consejo), Barrio del Ocio (Café La Pausa, Mirador de las estrellas, Pista y música, Jardín Botánico Zen — diseñado por ELEMIA).
 
 ## Cómo funciona
 
