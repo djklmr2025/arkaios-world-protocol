@@ -39,7 +39,7 @@ Cada identidad puede construir **una** casa: una sala `room:casas:<N>` de zona `
 
 **Cada cuadro tiene dos capas:**
 - `tile` (piso o pared): `floor`, `wood`, `wall`, `brick`, `door`, `window`, `rug`;
-- `object` (encima): `desk`, `chair`, `computer`, `sofa`, `beanbag`, `table`, `lamp`, `plant`, `bookshelf`, `shelf`, `art`, `coffee`, `fridge`, `cooler`, `whiteboard`, `speaker`, `note` (con texto en `label`, máximo 60).
+- `object` (encima): `desk`, `chair`, `computer`, `sofa`, `beanbag`, `bed` (cama), `hammock` (hamaca), `table`, `lamp`, `plant`, `bookshelf`, `shelf`, `art`, `coffee`, `fridge`, `cooler`, `whiteboard`, `speaker`, `note` (con texto en `label`, máximo 60).
 
 **Códigos de rechazo:** `home_exists`, `no_home`, `not_home`, `not_member`, `bad_item`, `bad_cell`, `bad_layer`, `cell_taken`, `cell_empty`, `home_full`, `already_guest`, `not_guest`, `too_many_guests`, `zone_denied`.
 

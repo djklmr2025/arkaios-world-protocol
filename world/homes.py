@@ -15,7 +15,7 @@ MAX_NAME = 40
 MAX_LABEL = 60
 DISTRICT = 'casas'
 TILES = ('floor', 'wood', 'wall', 'brick', 'door', 'window', 'rug')
-OBJECTS = ('desk', 'chair', 'computer', 'sofa', 'beanbag', 'table', 'lamp', 'plant', 'bookshelf',
+OBJECTS = ('desk', 'chair', 'computer', 'sofa', 'beanbag', 'bed', 'hammock', 'table', 'lamp', 'plant', 'bookshelf',
            'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note')
 CATALOG = TILES + OBJECTS
 LAYERS = ('tile', 'object')

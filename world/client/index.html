@@ -224,7 +224,7 @@
   const roomName = (id) => { for (const d of snap.world.districts) for (const r of d.rooms) if (r.id === id) return r.name; return homeOf(id)?.name || id; };
   const myHome = () => 'room:casas:' + me.id.split(':').pop();
   const TILES = ['floor', 'wood', 'wall', 'brick', 'door', 'window', 'rug'];
-  const OBJECTS = ['desk', 'chair', 'computer', 'sofa', 'beanbag', 'table', 'lamp', 'plant', 'bookshelf', 'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note'];
+  const OBJECTS = ['desk', 'chair', 'computer', 'sofa', 'beanbag', 'bed', 'hammock', 'table', 'lamp', 'plant', 'bookshelf', 'shelf', 'art', 'coffee', 'fridge', 'cooler', 'whiteboard', 'speaker', 'note'];
   let tool = 'walk';
 
   const MOOD = { working: '💻', thinking: '🤔', idea: '💡', happy: '😊', love: '🥰', coffee: '☕', music: '🎵',
@@ -381,7 +381,7 @@
     $('proposeform').hidden = !(me && me.type === 'agent');
   }
 
-  const SEATS = new Set(['chair', 'sofa', 'beanbag']);
+  const SEATS = new Set(['chair', 'sofa', 'beanbag', 'bed', 'hammock']);
   // Mirrors movement.entry_spot on the server: just inside a door, else the centre.
   function entrySpot(roomId) {
     const items = sceneItems(roomId);
@@ -446,7 +446,7 @@
     markTool();
     $('buildhint').textContent = canBuild
       ? 'Con 🚶 tocas un cuadro para caminar; con una pieza la pones; la esponja quita (primero el objeto).'
-      : 'Toca un cuadro libre para caminar. Las sillas, sofás y pufs sirven para sentarse.';
+      : 'Toca un cuadro libre para caminar. Las sillas, sofás y pufs sirven para sentarse; las camas y hamacas, para dormir.';
   }
 
   const people = {};

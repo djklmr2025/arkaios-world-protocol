@@ -7,7 +7,7 @@ walkable cell. Seats (chair, sofa, beanbag) are walkable: standing on one = sitt
 from homes import CATALOG, GRID_H, GRID_W, TILES
 
 WALL_TILES = frozenset({'wall', 'brick', 'window'})
-SEATS = frozenset({'chair', 'sofa', 'beanbag'})
+SEATS = frozenset({'chair', 'sofa', 'beanbag', 'bed', 'hammock'})
 PASSABLE_OBJECTS = SEATS | {'note'}
 PUBLIC_DOOR = (7, GRID_H - 2)
 

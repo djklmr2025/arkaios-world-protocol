@@ -21,6 +21,7 @@ WORLD = os.environ.get('ARKAIOS_WORLD_URL', 'http://127.0.0.1:4300')
 TIMEOUT_S = 3
 SESSION_TTL_S = 12 * 3600
 SEAT_ORDER = ('chair', 'sofa', 'beanbag')
+SLEEP_ORDER = ('bed', 'hammock', 'sofa', 'beanbag')
 # A compacted or resumed session is the same work going on: stay where the avatar is.
 STAY_SOURCES = frozenset({'compact', 'resume'})
 
@@ -134,8 +135,8 @@ def sleep(client: Client, me: dict, world: dict) -> None:
     home = next((h for h in world.get('homes', []) if h['id'] == home_id), None)
     if home and world['presence'][my_id]['room'] != home_id:
         client.act(type='move', room=home_id)
-    bed = next((i for i in (home or {}).get('items', [])
-                if i['layer'] == 'object' and i['item'] in ('sofa', 'beanbag')), None)
+    beds = [i for i in (home or {}).get('items', []) if i['layer'] == 'object' and i['item'] in SLEEP_ORDER]
+    bed = min(beds, key=lambda i: SLEEP_ORDER.index(i['item']), default=None)
     if bed:
         client.act(type='walk', x=bed['x'], y=bed['y'])
     client.act(type='status', status='away', mood='sleeping', note='fuera de sesión')

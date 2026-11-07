@@ -196,6 +196,34 @@ class WalkTests(Base):
         self.act(self.a, type='move', room=home)
         self.assertEqual(self.pos(self.a), (5, 8))
 
+    def test_beds_and_hammocks_are_placeable_and_walkable(self):
+        home = self.act(self.a, type='home_build')[0]['target']
+        self.act(self.a, type='move', room=home)
+        self.act(self.a, type='place', item='door', x=5, y=9)
+        self.act(self.a, type='place', item='bed', x=2, y=2)
+        self.act(self.a, type='place', item='hammock', x=6, y=2)
+        self.act(self.a, type='walk', x=2, y=2)
+        self.assertEqual(self.pos(self.a), (2, 2))
+        self.act(self.a, type='walk', x=6, y=2)
+        self.assertEqual(self.pos(self.a), (6, 2))
+
+    def test_sleep_prefers_bed_over_sofa(self):
+        import presence_hook
+
+        home = {'items': [{'layer': 'object', 'item': 'sofa', 'x': 1, 'y': 1},
+                          {'layer': 'object', 'item': 'bed', 'x': 4, 'y': 2}]}
+        calls = []
+
+        class Fake:
+            def act(self, **a):
+                calls.append(a)
+
+        me = {'id': 'ark:local-alpha:9'}
+        world = {'presence': {me['id']: {'room': 'room:casas:9'}},
+                 'homes': [{**home, 'id': 'room:casas:9'}]}
+        presence_hook.sleep(Fake(), me, world)
+        self.assertIn({'type': 'walk', 'x': 4, 'y': 2}, calls)
+
     def test_knock_notifies_owner(self):
         home = self.act(self.a, type='home_build')[0]['target']
         self.rejects(self.a, 'own_home', type='knock', home=home)
