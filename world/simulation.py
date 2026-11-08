@@ -55,6 +55,14 @@ STORIES = {
 }
 
 
+def public_session(session):
+    """What everyone else sees: who, where and when — never the words (the story belongs to its players)."""
+    view = deepcopy(session)
+    view['turns'] = [{k: v for k, v in t.items() if k != 'text'} for t in session['turns']]
+    view['private'] = True
+    return view
+
+
 def _rejected(code: str, message: str) -> Exception:
     from state import Rejected
     return Rejected(code, message)
@@ -79,8 +87,15 @@ class Simulations:
         return {'simulations': {
             'stories': {k: {kk: v[kk] for kk in ('title', 'setting', 'rules', 'roles', 'opening', 'rooms')}
                         for k, v in STORIES.items()},
-            'sessions': [deepcopy(s) for s in recent[:SESSIONS_SHOWN]],
+            'sessions': [public_session(s) for s in recent[:SESSIONS_SHOWN]],
         }}
+
+    def private_view(self, entity_id, session_id):
+        """The full story, words included: only for the two players of that session."""
+        session = self.sessions.get(session_id)
+        if session is None or entity_id not in session['players']:
+            return None
+        return deepcopy(session)
 
     # ---------- decisions ----------
 

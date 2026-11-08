@@ -132,7 +132,7 @@
       const d = el('div', 'turn ' + t.role), w = el('div');
       w.append(el('span', 'who', s.names[t.role] || t.role));
       if (t.location) w.append(el('span', 'where', '→ ' + ROOM_NAME(t.location)));
-      d.append(w, el('div', 'text', t.text));
+      d.append(w, t.text ? el('div', 'text', t.text) : el('div', 'muted', '🔒 Palabras privadas entre quienes juegan · ' + new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
       log.append(d);
     }
     if (s.status === 'broken') log.append(el('p', 'opening', '…y de pronto todo se duplica. Mil Yukihos. Mil jugadores. Cada quien tendrá que reconocer al suyo por lo que vivieron juntos.'));

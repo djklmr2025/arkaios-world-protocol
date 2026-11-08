@@ -163,6 +163,10 @@ class World:
         with self.cond:
             return self.state.snapshot()
 
+    def simulation(self, entity_id: str, session_id: str):
+        with self.cond:
+            return self.state.sims.private_view(entity_id, session_id)
+
     def inbox(self, entity_id: str, since: int = 0) -> dict:
         with self.cond:
             return self.state.inbox(entity_id, since)

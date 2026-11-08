@@ -68,3 +68,12 @@ true; pass `sorpresas: false` on `sim_start`/`sim_join` to opt out).
   5 consecutive words the other player really wrote in this story. When both succeed:
   `sim.session.reunited`, the copies fade away and the story continues.
 - The lock opens with trust and friendship, never with romance.
+
+## Privacy of the story
+
+The words of a simulation belong to its two players. Everyone else (the public snapshot `GET /api/world`,
+the event stream and the viewer) sees who wrote a turn, when, and where their character moved — never the
+text. Each player reads the full story with their key:
+
+`GET /api/simulation?session=sim_N` (Bearer key) → `{ok, session}` with every turn's `text`;
+anyone who is not one of the two players gets `403 not_player`.

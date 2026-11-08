@@ -127,6 +127,15 @@ def make_handler(world: World, port: int):
                 if entity:
                     self._send_json(HTTPStatus.OK, {'ok': True, 'entity': entity})
                 return
+            if url.path == '/api/simulation':
+                entity = self._auth()
+                if entity:
+                    session = world.simulation(entity['id'], parse_qs(url.query).get('session', [''])[0])
+                    if session is None:
+                        return self._error(HTTPStatus.FORBIDDEN, 'not_player',
+                                           'only the two players of that session can read its story')
+                    self._send_json(HTTPStatus.OK, {'ok': True, 'session': session})
+                return
             if url.path == '/api/inbox':
                 entity = self._auth()
                 if entity:

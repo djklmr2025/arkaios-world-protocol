@@ -19,6 +19,8 @@ def _rejected(code: str, message: str) -> Exception:
 
 def public_view(event: dict) -> dict:
     """What the public stream may show of an event: private ones keep only seq/time."""
+    if event['type'] == 'sim.turn.posted':  # simulation words are private to the two players
+        return {**event, 'payload': {k: v for k, v in event['payload'].items() if k != 'text'}}
     if event['type'] not in PRIVATE_TYPES:
         return event
     return {'v': event['v'], 'seq': event['seq'], 'event_id': event['event_id'], 'type': 'private',

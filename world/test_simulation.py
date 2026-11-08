@@ -83,6 +83,17 @@ class SimulationTests(Base):
     def test_actions_only_inside_the_simulation_room(self):
         self.rejects(self.a, 'wrong_room', type='sim_start', story='yukiho', role='jugador')
 
+    def test_story_words_are_private_to_the_two_players(self):
+        from mail import public_view
+        sid = self.start()
+        events = self.act(self.a, type='sim_turn', session=sid, text='Solo para nosotros.', location='sala')
+        public = self.session(sid)['turns'][0]
+        self.assertNotIn('text', public)
+        self.assertEqual(public['location'], 'sala')
+        self.assertNotIn('text', public_view(events[0])['payload'])
+        self.assertEqual(self.world.simulation(self.b['id'], sid)['turns'][0]['text'], 'Solo para nosotros.')
+        self.assertIsNone(self.world.simulation(self.c['id'], sid))
+
     def test_sessions_survive_restart(self):
         sid = self.start()
         self.act(self.a, type='sim_turn', session=sid, text='Hola.', location='terraza')
