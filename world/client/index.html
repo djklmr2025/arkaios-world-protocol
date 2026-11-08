@@ -138,6 +138,11 @@
         <div class="palette" id="palette"></div>
         <div class="muted" id="buildhint" style="font-size:12px;margin-top:6px"></div>
       </div>
+      <div id="simapt" hidden style="margin-top:12px">
+        <div class="muted" style="font-size:12px;margin-bottom:6px">🎭 Conectado a esta sala: el departamento de la simulación en curso · <a href="/simulacion" style="color:inherit">abrir visor completo →</a></div>
+        <div class="apt-card" id="aptMap"></div>
+        <div class="muted" id="simaptinfo" style="font-size:12px;margin-top:6px"></div>
+      </div>
       <div class="credit">Arte de píxeles y personajes: Miniverse (licencia MIT, world/client/assets/LICENSE-miniverse.txt).</div>
     </div>
   </div>
@@ -202,6 +207,7 @@
     </section>
   </aside>
 </main>
+<script src="/sim/apartment-map.js"></script>
 <script>
 (() => {
   const ZONE = { home: 'casa', public_sandbox: 'pública', trusted_collaboration: 'confianza', restricted: 'restringida',
@@ -268,6 +274,24 @@
     return a;
   }
 
+  // Departamento attached to the simulation room: shows where the characters of the current session are.
+  const SIM_ROOM = 'room:simulacion:ra';
+  let simMapSession = null;
+  function renderSimApartment() {
+    const box = $('simapt');
+    box.hidden = selRoom !== SIM_ROOM || !window.ApartmentMap;
+    if (box.hidden) return;
+    if (!$('aptMap').childElementCount) ApartmentMap.mount($('aptMap'));
+    const sessions = (snap.simulations && snap.simulations.sessions) || [];
+    const s = sessions.find((x) => x.status !== 'ended') || sessions[0];
+    if (!s) { $('simaptinfo').textContent = 'Sin sesiones todavía: el departamento espera a sus dos personajes.'; return; }
+    window.getProtagonistName = () => s.names.jugador || 'Jugador';
+    if (simMapSession !== s.id) { ApartmentMap.restore(s.location); simMapSession = s.id; }
+    else ApartmentMap.update({ ubicacion: s.location }, '');
+    ApartmentMap.mirror(s.status === 'broken' ? 'broken' : s.reunited ? 'reunited' : 'off');
+    $('simaptinfo').textContent = `${s.id} · ${s.names.yukiho || 'Yukiho'} y ${s.names.jugador || 'Jugador'} · vínculo ${s.trust || 0}%`;
+  }
+
   function render() {
     $('wname').textContent = snap.world.name; $('wid').textContent = snap.world.id;
     $('seq').textContent = snap.seq;
@@ -301,6 +325,7 @@
     }
     renderTasks();
     renderCouncil();
+    renderSimApartment();
     renderHome();
     if (me) $('me').textContent = `Eres ${me.display_name} · ${me.id} · ${snap.credits?.[me.id] ?? '?'} créditos de prueba`;
   }
@@ -513,12 +538,26 @@
     try { await api('POST', '/api/actions', body); } catch (e) { $('err').textContent = e.message; }
   }
 
+  // «El Espejo de las Mil Yukihos»: a world-wide alert when a simulation breaks (live events only).
+  let bootSeq = Infinity;
+  function showAnomaly(e) {
+    let bar = document.getElementById('anomaly');
+    if (!bar) {
+      bar = el('a', null); bar.id = 'anomaly'; bar.href = '/simulacion';
+      Object.assign(bar.style, { position: 'fixed', top: '0', left: '0', right: '0', zIndex: '50', padding: '10px', textAlign: 'center',
+        background: '#2a0716', color: '#ff4f9a', fontWeight: '800', letterSpacing: '.05em', textDecoration: 'none', borderBottom: '1px solid #ff4f9a' });
+      document.body.append(bar);
+    }
+    bar.textContent = `⚠️ ANOMALÍA EN LA SALA DE SIMULACIÓN · ${e.target} se rompió en ${e.payload.copies} copias · ver →`;
+    setTimeout(() => bar.remove(), 45000);
+  }
   const NOTICE = { 'task.claimed': 'tomó', 'task.released': 'soltó', 'task.delivered': 'entregó',
                    'task.rejected': 'rechazó la entrega de', 'task.accepted': 'aceptó y pagó', 'task.cancelled': 'canceló',
                    'gov.proposal.opened': 'abrió a votación', 'gov.proposal.passed': 'cerró con aprobación',
                    'gov.proposal.rejected': 'cerró con rechazo', 'sim.player.joined': 'se unió a tu simulación',
                    'sim.turn.posted': 'te respondió en', 'sim.session.paused': 'pausó', 'sim.session.resumed': 'reanudó',
-                   'sim.session.ended': 'terminó' };
+                   'sim.session.ended': 'terminó', 'sim.session.broken': 'rompió la simulación', 'sim.player.recognized': 'te encontró entre mil en',
+                   'sim.session.reunited': 'se reencontró contigo en' };
   async function loadInbox() {
     if (!me) return;
     try {
@@ -553,7 +592,7 @@
   function refreshTasks() {
     clearTimeout(tasksTimer);
     tasksTimer = setTimeout(async () => {
-      try { const j = await (await fetch('/api/world', { cache: 'no-store' })).json(); snap.tasks = j.tasks; snap.credits = j.credits; snap.homes = j.homes; snap.council = j.council; snap.presence = j.presence; render(); }
+      try { const j = await (await fetch('/api/world', { cache: 'no-store' })).json(); snap.tasks = j.tasks; snap.credits = j.credits; snap.homes = j.homes; snap.council = j.council; snap.presence = j.presence; snap.simulations = j.simulations; render(); }
       catch (e) { /* next task event retries */ }
     }, 150);
   }
@@ -595,6 +634,9 @@
       case 'sim.session.paused': return `⏸️ ${who} pausó ${e.target}`;
       case 'sim.session.resumed': return `▶️ ${who} reanudó ${e.target}`;
       case 'sim.session.ended': return `🎬 ${who} terminó ${e.target}`;
+      case 'sim.session.broken': return `⚠️ ANOMALÍA: la simulación ${e.target} se rompió en ${e.payload.copies} copias`;
+      case 'sim.player.recognized': return `🔎 ${who} reconoció a los suyos entre mil en ${e.target}`;
+      case 'sim.session.reunited': return `✨ En ${e.target} se encontraron entre mil copias`;
       case 'gov.emergency.set': return e.payload.frozen ? `⛔ ${who} congeló el mundo: ${e.payload.reason}` : `${who} descongeló el mundo`;
       case 'private': return null;
       default: return e.type;
@@ -626,6 +668,7 @@
         flash(e.actor, 'say', { text: e.payload.text }, SAY_MS); break;
     }
     if (e.type.startsWith('task.') || e.type.startsWith('home.') || e.type.startsWith('gov.') || e.type.startsWith('sim.')) refreshTasks();
+    if (e.type === 'sim.session.broken' && e.seq > bootSeq) showAnomaly(e);
     if (e.type === 'home.knocked' && me && homeOf(e.target)?.owner === me.id) flash(e.actor, 'emote', { emote: 'wave' }, EMOTE_MS);
     if (e.type === 'private' || e.type.startsWith('task.') || e.type === 'home.knocked' || e.type.startsWith('gov.proposal.')) setTimeout(loadInbox, 200);
     snap.seq = e.seq;
@@ -660,6 +703,7 @@
   async function load() {
     const r = await fetch('/api/world', { cache: 'no-store' });
     snap = await r.json();
+    bootSeq = snap.seq;
     selRoom = selRoom || snap.world.spawn;
     render(); connect();
   }

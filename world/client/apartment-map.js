@@ -1,5 +1,5 @@
 /*
- * ARKAIOS · Departamento de Cancún en pixel art (mapa vivo de la novela).
+ * ARKAIOS · Departamento de Cancún en pixel art (copy of the Yukiho game map + «El Espejo» crowd/glitch).
  * The story AI says where each character is ("ubicacion"); they walk there and the camera zooms
  * into that room. All art is drawn procedurally (no external images) at 8 px per tile.
  *
@@ -210,7 +210,7 @@ Solo cambia de espacio cuando la historia lo justifique y narra el traslado. Por
   }
 
   function targetCamera() {
-    if (showAll) return { x: 0, y: 0, w: COLS * T, h: ROWS * T };
+    if (showAll || mirrorState === 'broken' || clones.length) return { x: 0, y: 0, w: COLS * T, h: ROWS * T };
     const rooms = new Set([actors.yukiho?.room, actors.jugador?.room, focusRoom].filter(Boolean));
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const id of rooms) { const r = ROOMS[id]; x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
@@ -222,19 +222,78 @@ Solo cambia de espacio cuando la historia lo justifique y narra el traslado. Por
     return { x, y, w, h };
   }
 
+  // ---------- «El Espejo de las Mil Yukihos» (world-viewer only) ----------
+  const CLONES_DRAWN = 160;  // drawn on screen; the story says a thousand
+  let clones = [], mirrorState = 'off', mirrorAt = 0;
+  function walkableTiles() {
+    const out = [];
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (grid[y][x] !== 'wall' && !blocked.has(`${x},${y}`)) out.push([x, y]);
+    return out;
+  }
+  function setMirror(state) {
+    if (state === mirrorState) return;
+    mirrorState = state; mirrorAt = performance.now();
+    if (state === 'broken') {
+      const tiles = walkableTiles();
+      clones = Array.from({ length: CLONES_DRAWN }, (_, i) => {
+        const [x, y] = tiles[Math.floor(Math.random() * tiles.length)];
+        return { id: i % 2 ? 'yukiho' : 'jugador', x: x * T, y: y * T, path: [], alpha: 0.85, clone: true };
+      });
+    }
+    if (state === 'off') clones = [];
+  }
+  function moveAlong(a, dt, speed) {
+    if (!a.path.length) return;
+    const [tx, ty] = a.path[0];
+    const step = speed * T * dt;
+    const dx = tx * T - a.x, dy = ty * T - a.y, dist = Math.hypot(dx, dy);
+    if (dist <= step) { a.x = tx * T; a.y = ty * T; a.path.shift(); } else { a.x += dx / dist * step; a.y += dy / dist * step; }
+  }
+  function wanderClones(dt, time) {
+    const fading = mirrorState === 'reunited';
+    for (const c of clones) {
+      if (fading) c.alpha = Math.max(0, 0.85 - (time - mirrorAt) / 3500);
+      if (!c.path.length && Math.random() < 0.02) {
+        const tx = Math.max(1, Math.min(COLS - 2, Math.round(c.x / T) + Math.round(Math.random() * 8 - 4)));
+        const ty = Math.max(1, Math.min(ROWS - 2, Math.round(c.y / T) + Math.round(Math.random() * 6 - 3)));
+        if (grid[ty][tx] !== 'wall' && !blocked.has(`${tx},${ty}`)) c.path = findPath(Math.round(c.x / T), Math.round(c.y / T), tx, ty).slice(0, 12);
+      }
+      moveAlong(c, dt, 2.2);
+    }
+    if (fading && clones.every(c => c.alpha <= 0)) clones = [];
+  }
+  function glitch(time) {
+    if (mirrorState !== 'broken') return;
+    const w = view.width, h = view.height;
+    for (let i = 0; i < 5; i++) {
+      const y = Math.floor(Math.random() * h), bh = 4 + Math.floor(Math.random() * 18), dx = Math.floor(Math.random() * 30 - 15);
+      vctx.drawImage(view, 0, y, w, bh, dx, y, w, bh);
+    }
+    vctx.fillStyle = `rgba(255,0,90,${0.05 + 0.05 * Math.sin(time / 90)})`; vctx.fillRect(0, 0, w, h);
+    vctx.fillStyle = 'rgba(0,0,0,.55)'; vctx.fillRect(0, h - 34, w, 34);
+    vctx.fillStyle = '#ff4f9a'; vctx.font = 'bold 13px monospace'; vctx.textAlign = 'center';
+    vctx.fillText('×1000 · SE ROMPIÓ · ¿CUÁL ES LA TUYA?', w / 2, h - 12, w - 16);
+  }
+  function reunionGlow(c, time) {
+    if (mirrorState !== 'reunited' || time - mirrorAt > 9000) return;
+    const a = actors.yukiho, b = actors.jugador;
+    const x = (a.x + b.x) / 2 + T / 2, y = (a.y + b.y) / 2;
+    const g = c.createRadialGradient(x, y, 1, x, y, 28);
+    g.addColorStop(0, 'rgba(255,255,230,.55)'); g.addColorStop(1, 'rgba(255,255,230,0)');
+    c.fillStyle = g; c.fillRect(x - 28, y - 28, 56, 56);
+  }
+
   let last = 0;
   function frame(time) {
     const dt = Math.min(0.05, (time - last) / 1000 || 0); last = time;
-    for (const a of Object.values(actors)) {
-      if (!a.path.length) continue;
-      const [tx, ty] = a.path[0];
-      const step = WALK_TILES_PER_SEC * T * dt;
-      const dx = tx * T - a.x, dy = ty * T - a.y, dist = Math.hypot(dx, dy);
-      if (dist <= step) { a.x = tx * T; a.y = ty * T; a.path.shift(); } else { a.x += dx / dist * step; a.y += dy / dist * step; }
-    }
+    for (const a of Object.values(actors)) moveAlong(a, dt, WALK_TILES_PER_SEC);
+    wanderClones(dt, time);
     wctx.clearRect(0, 0, COLS * T, ROWS * T);
     drawFloor(wctx);
     for (const f of FURNITURE) f.draw(wctx, f.x * T, f.y * T, time);
+    for (const c of clones.slice().sort((a, b) => a.y - b.y)) { wctx.globalAlpha = c.alpha; drawActor(wctx, c, time); }
+    wctx.globalAlpha = 1;
+    reunionGlow(wctx, time);
     Object.values(actors).sort((a, b) => a.y - b.y).forEach(a => drawActor(wctx, a, time));
     drawRain(wctx, dt);
     drawNight(wctx, time);
@@ -244,6 +303,7 @@ Solo cambia de espacio cuando la historia lo justifique y narra el traslado. Por
     vctx.imageSmoothingEnabled = false;
     vctx.fillStyle = '#0d0a16'; vctx.fillRect(0, 0, view.width, view.height);
     vctx.drawImage(world, cam.x, cam.y, cam.w, cam.h, 0, 0, view.width, view.height);
+    glitch(time);
     requestAnimationFrame(frame);
   }
 
@@ -349,5 +409,5 @@ Solo cambia de espacio cuando la historia lo justifique y narra el traslado. Por
     .apt-label{font-size:11px;color:var(--text-muted,#aaa);text-align:center;min-height:14px}`;
   document.head.appendChild(css);
 
-  window.ApartmentMap = { mount, update, restore, salvageJson, cleanScene, rooms: ROOMS };
+  window.ApartmentMap = { mount, update, restore, salvageJson, cleanScene, mirror: setMirror, rooms: ROOMS };
 })();

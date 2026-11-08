@@ -35,6 +35,19 @@
   select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:4px 8px; }
   #log { max-height:62vh; overflow:auto; }
   .locked { text-align:center; padding:40px 16px; }
+  .bond { display:flex; align-items:center; gap:10px; margin-top:8px; font-size:12px; color:var(--muted); }
+  .bar { flex:1; height:6px; background:var(--line); border-radius:99px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg,var(--teal),var(--rose)); transition:width .8s; }
+  .moments span { margin-left:4px; filter:grayscale(1); opacity:.35; }
+  .moments span.on { filter:none; opacity:1; }
+  .banner { display:none; text-align:center; font-weight:800; letter-spacing:.06em; padding:10px; border-radius:10px; margin-bottom:10px; }
+  body.broken .banner.b { display:block; background:#2a0716; color:#ff4f9a; border:1px solid #ff4f9a; animation: flick 1.2s infinite; }
+  body.reunited .banner.r { display:block; background:#0b2420; color:var(--teal); border:1px solid var(--teal); }
+  body.broken main { animation: shake .35s infinite; }
+  body.broken .turn .text { text-shadow: 2px 0 rgba(255,0,90,.55), -2px 0 rgba(0,220,255,.45); }
+  @keyframes flick { 50% { opacity:.55; } }
+  @keyframes shake { 25% { transform:translate(1px,0); } 75% { transform:translate(-1px,0); } }
+  @media (prefers-reduced-motion: reduce) { body.broken main, body.broken .banner.b { animation:none; } }
 </style>
 </head>
 <body>
@@ -44,6 +57,8 @@
 </header>
 <main>
   <div class="col">
+    <div class="banner b" role="alert">⚠️ LA SIMULACIÓN SE ROMPIÓ · HAY MIL COPIAS · CADA QUIEN DEBE ENCONTRAR A LA SUYA</div>
+    <div class="banner r" role="status">✨ SE ENCONTRARON ENTRE MIL · LA MEMORIA COMPARTIDA FUE LA LLAVE</div>
     <section id="head"></section>
     <section><h2>Historia en vivo</h2><div id="log" aria-live="polite"></div></section>
   </div>
@@ -59,7 +74,8 @@
   let snap = null, chosen = null, mapSession = null, lastSeq = 0;
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
-  const STATUS = { waiting: 'esperando 2.º jugador', active: 'en curso', paused: 'en pausa', ended: 'terminada' };
+  const STATUS = { waiting: 'esperando 2.º jugador', active: 'en curso', paused: 'en pausa', ended: 'terminada', broken: '⚠️ rota' };
+  const MOMENT_ICONS = { te: '☕', cuaderno: '📖', terraza: '🌧️', secreto: '🤫' };
   const ROOM_NAME = (id) => (window.ApartmentMap && ApartmentMap.rooms[id] ? ApartmentMap.rooms[id].name : id);
 
   window.getProtagonistName = () => (current() && current().names.jugador) || 'Jugador';
@@ -95,6 +111,12 @@
     if (s) {
       const t = el('div'); t.append(el('b', null, story.title + '  '), el('span', 'status ' + s.status, STATUS[s.status]));
       head.append(t, el('div', 'muted', story.setting));
+      const bond = el('div', 'bond'), bar = el('div', 'bar'), fill = el('i'), moms = el('span', 'moments');
+      fill.style.width = (s.trust || 0) + '%'; bar.append(fill);
+      for (const [k, icon] of Object.entries(MOMENT_ICONS)) moms.append(el('span', (s.moments || []).includes(k) ? 'on' : '', (s.moments || []).includes(k) ? icon : '?'));
+      bond.append(el('span', null, `Vínculo ${s.trust || 0}%`), bar, moms);
+      head.append(bond);
+      if (s.status === 'broken') head.append(el('div', 'muted', `Encontraron a los suyos: ${(s.recognized || []).map(agentName).join(', ') || 'nadie todavía'}`));
     }
     renderLog(s, story);
     renderCast(s, story);
@@ -113,6 +135,8 @@
       d.append(w, el('div', 'text', t.text));
       log.append(d);
     }
+    if (s.status === 'broken') log.append(el('p', 'opening', '…y de pronto todo se duplica. Mil Yukihos. Mil jugadores. Cada quien tendrá que reconocer al suyo por lo que vivieron juntos.'));
+    if (s.reunited) log.append(el('p', 'opening', '✨ Entre mil copias se reconocieron: no por la cara, sino por lo que se dijeron esta noche.'));
     log.scrollTop = log.scrollHeight;
   }
 
@@ -134,7 +158,10 @@
   }
 
   function syncMap(s) {
+    document.body.classList.toggle('broken', !!s && s.status === 'broken');
+    document.body.classList.toggle('reunited', !!s && s.reunited && s.status !== 'broken');
     if (!window.ApartmentMap || !s) return;
+    ApartmentMap.mirror(s.status === 'broken' ? 'broken' : s.reunited ? 'reunited' : 'off');
     if (mapSession !== s.id) { ApartmentMap.restore(s.location); mapSession = s.id; return; }
     ApartmentMap.update({ ubicacion: s.location }, '');
   }

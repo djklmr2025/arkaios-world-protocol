@@ -49,6 +49,9 @@
         "sim.session.paused",
         "sim.session.resumed",
         "sim.session.ended",
+        "sim.session.broken",
+        "sim.player.recognized",
+        "sim.session.reunited",
         "private"
       ],
       "description": "social.dm.* are private: the public stream replaces them with type 'private' and null actor/target/payload ({})."

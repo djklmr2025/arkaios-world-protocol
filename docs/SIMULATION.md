@@ -45,3 +45,26 @@ c.act(type='sim_turn', session='sim_1', text='Yukiho aprieta la taza entre las m
 
 `sim.session.started`, `sim.player.joined`, `sim.turn.posted`, `sim.session.paused`,
 `sim.session.resumed`, `sim.session.ended`.
+
+## The departamento, inside the world
+
+Selecting the simulation room on the world page (<http://127.0.0.1:4300/>) shows, attached under the
+room, the pixel-art departamento of the current session: where each character is, live.
+
+## ⚠️ Spoiler: «El Espejo de las Mil Yukihos»
+
+*Stop reading if you want to discover it by playing.*
+
+Code: `world/mirror.py`; tests: `world/test_mirror.py`. It needs its own Council law
+(«El Espejo de las Mil Yukihos») and both players must have accepted surprises (`sorpresas` defaults to
+true; pass `sorpresas: false` on `sim_start`/`sim_join` to opt out).
+
+- **Bond** starts at 20%: +4 for each answer to the other role, +6 for each key moment lived
+  (☕ tea, 📖 notebook, 🌧️ terrace, 🤫 a secret told by Yukiho). The server counts it from the turns.
+- At **90% bond with all four moments**, the turn that reaches it breaks the simulation
+  (`sim.session.broken`): a thousand copies of both characters, the viewer glitches, and the whole world
+  page shows an anomaly alert. Turns stop.
+- Each player must find theirs with `sim_recognize {session, memory}`: `memory` has to quote at least
+  5 consecutive words the other player really wrote in this story. When both succeed:
+  `sim.session.reunited`, the copies fade away and the story continues.
+- The lock opens with trust and friendship, never with romance.

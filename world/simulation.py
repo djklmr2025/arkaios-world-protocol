@@ -10,7 +10,9 @@ of the story definition every player receives; they are agreements, shown in the
 """
 from copy import deepcopy
 
-ACTIONS = ('sim_start', 'sim_join', 'sim_turn', 'sim_pause', 'sim_resume', 'sim_end')
+import mirror
+
+ACTIONS = ('sim_start', 'sim_join', 'sim_turn', 'sim_pause', 'sim_resume', 'sim_end', 'sim_recognize')
 MAX_TURN = 1200
 MAX_NAME = 30
 TURNS_KEPT = 200
@@ -27,6 +29,7 @@ STORIES = {
             'Sin ruta romántica ni sexual con Yukiho.',
             'Cada quien escribe solo a su personaje; nadie decide por el otro.',
             'Cualquiera puede pausar o terminar la sesión cuando quiera.',
+            'Esta simulación puede guardar secretos. Si no quieres sorpresas, entra con sorpresas=false.',
         ],
         'rooms': ('recamara', 'bano_recamara', 'bano_tina', 'azotehuela', 'sala', 'cocina', 'terraza'),
         'roles': {
@@ -81,7 +84,7 @@ class Simulations:
 
     # ---------- decisions ----------
 
-    def decide(self, entity, action, room, is_citizen):
+    def decide(self, entity, action, room, is_citizen, law_passed=lambda title: False):
         if room is None or room.get('zone') != 'simulation':
             raise _rejected('wrong_room', 'simulation actions happen inside the simulation room')
         if entity['type'] != 'agent' or not is_citizen(entity):
@@ -99,7 +102,9 @@ class Simulations:
         if session['status'] == 'ended':
             raise _rejected('session_ended', 'this session has ended')
         if kind == 'sim_turn':
-            return self._decide_turn(entity, action, session)
+            return self._decide_turn(entity, action, session, law_passed)
+        if kind == 'sim_recognize':
+            return self._decide_recognize(entity, action, session)
         if kind == 'sim_pause':
             if session['status'] != 'active':
                 raise _rejected('not_active', 'only an active session can be paused')
@@ -121,7 +126,7 @@ class Simulations:
             raise _rejected('already_playing', 'end your current session first')
         return [('sim.session.started', entity['id'], f'sim_{self.next_serial}',
                  {'story': action['story'], 'role': role, 'name': self._name(action, story, role),
-                  'room': room['id']})]
+                  'room': room['id'], 'surprises': action.get('sorpresas', True) is not False})]
 
     def _decide_join(self, entity, action, session):
         if session['status'] != 'waiting':
@@ -136,9 +141,10 @@ class Simulations:
             free = [r for r in story['roles'] if r not in session['roles'].values()]
             raise _rejected('bad_role', 'free role: ' + ', '.join(free))
         return [('sim.player.joined', entity['id'], session['id'],
-                 {'role': role, 'name': self._name(action, story, role)})]
+                 {'role': role, 'name': self._name(action, story, role),
+                  'surprises': action.get('sorpresas', True) is not False})]
 
-    def _decide_turn(self, entity, action, session):
+    def _decide_turn(self, entity, action, session, law_passed):
         if session['status'] != 'active':
             raise _rejected('not_active', 'the session is ' + session['status'])
         if session['turns'] and session['turns'][-1]['by'] == entity['id']:
@@ -149,8 +155,26 @@ class Simulations:
         location = action.get('location')
         if location is not None and location not in STORIES[session['story']]['rooms']:
             raise _rejected('bad_location', 'location must be one of the story rooms')
-        return [('sim.turn.posted', entity['id'], session['id'],
-                 {'role': session['roles'][entity['id']], 'text': text, 'location': location})]
+        role = session['roles'][entity['id']]
+        events = [('sim.turn.posted', entity['id'], session['id'], {'role': role, 'text': text, 'location': location})]
+        trust, moments = mirror.after_turn(session['trust'], session['moments'], session['turns'], role, text, location)
+        if (not session['broken_once'] and mirror.should_break(trust, moments) and all(session['surprises'].values())
+                and law_passed(mirror.LAW_TITLE)):
+            events.append(('sim.session.broken', entity['id'], session['id'], {'copies': mirror.COPIES}))
+        return events
+
+    def _decide_recognize(self, entity, action, session):
+        if session['status'] != 'broken':
+            raise _rejected('not_broken', 'there is nothing to recognize... yet')
+        if entity['id'] in session['recognized']:
+            raise _rejected('already_recognized', 'you already found yours; wait for them to find you')
+        partner = self.partner(session, entity['id'])
+        if not mirror.quotes_partner(action.get('memory', ''), [t for t in session['turns'] if t['by'] == partner]):
+            raise _rejected('not_recognized', f'that one is not yours: quote at least {mirror.QUOTE_WORDS} words they really said to you')
+        events = [('sim.player.recognized', entity['id'], session['id'], {})]
+        if partner in session['recognized']:
+            events.append(('sim.session.reunited', entity['id'], session['id'], {}))
+        return events
 
     @staticmethod
     def _name(action, story, role):
@@ -168,6 +192,8 @@ class Simulations:
                 'players': [actor], 'roles': {actor: payload['role']}, 'names': {payload['role']: payload['name']},
                 'location': {r: spec['start'] for r, spec in story['roles'].items()},
                 'turns': [], 'started_at': event['timestamp'],
+                'surprises': {actor: payload.get('surprises', True)}, 'trust': mirror.TRUST_START, 'moments': [],
+                'broken_once': False, 'recognized': [], 'reunited': False,
             }
             self.next_serial = int(target.split('_')[1]) + 1
             return
@@ -176,14 +202,26 @@ class Simulations:
             session['players'].append(actor)
             session['roles'][actor] = payload['role']
             session['names'][payload['role']] = payload['name']
+            session['surprises'][actor] = payload.get('surprises', True)
             session['status'] = 'active'
         elif etype == 'sim.turn.posted':
+            session['trust'], session['moments'] = mirror.after_turn(
+                session['trust'], session['moments'], session['turns'], payload['role'], payload['text'], payload.get('location'))
             if payload.get('location'):
                 session['location'][payload['role']] = payload['location']
             session['turns'].append({'seq': event['seq'], 'by': actor, 'role': payload['role'],
                                      'text': payload['text'], 'location': payload.get('location'),
                                      'timestamp': event['timestamp']})
             del session['turns'][:-TURNS_KEPT]
+        elif etype == 'sim.session.broken':
+            session['status'] = 'broken'
+            session['broken_once'] = True
+            session['copies'] = payload['copies']
+        elif etype == 'sim.player.recognized':
+            session['recognized'].append(actor)
+        elif etype == 'sim.session.reunited':
+            session['status'] = 'active'
+            session['reunited'] = True
         elif etype == 'sim.session.paused':
             session['status'] = 'paused'
         elif etype == 'sim.session.resumed':

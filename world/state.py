@@ -174,7 +174,7 @@ class WorldState:
             return self.board.decide(entity, action, self._require_joined(entity))
         if kind in sim_rules.ACTIONS:
             return self.sims.decide(entity, action, self.room(self._require_joined(entity)),
-                                    self.council.is_citizen)
+                                    self.council.is_citizen, self._law_passed)
         if kind == 'dm':
             return self.mail.decide_dm(entity, action, self._resolve(action.get('to')))
         if kind == 'dm_read':
@@ -376,6 +376,9 @@ class WorldState:
             self.mail.notify(sorted({proposal['author'], proposal['target']} - {None}), event, ref)
             if etype == 'gov.proposal.passed' and proposal['level'] in ('suspend', 'expel'):
                 self.presence.pop(proposal['target'], None)
+
+    def _law_passed(self, title):
+        return any(title in (law['proposal'], law['title']) for law in self.council.laws)
 
     def _apply_sim(self, event):
         self.sims.apply(event)
