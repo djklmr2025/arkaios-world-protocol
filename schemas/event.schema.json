@@ -43,6 +43,12 @@
         "gov.proposal.rejected",
         "gov.proposal.withdrawn",
         "gov.emergency.set",
+        "sim.session.started",
+        "sim.player.joined",
+        "sim.turn.posted",
+        "sim.session.paused",
+        "sim.session.resumed",
+        "sim.session.ended",
         "private"
       ],
       "description": "social.dm.* are private: the public stream replaces them with type 'private' and null actor/target/payload ({})."

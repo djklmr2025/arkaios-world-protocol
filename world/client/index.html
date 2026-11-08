@@ -122,6 +122,7 @@
     <div class="muted" id="wid"></div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="pill" href="/simulacion" style="text-decoration:none;color:inherit">🎭 Simulación</a>
     <span class="pill"><span class="dot" id="live"></span><span id="livetxt">conectando…</span></span>
     <span class="pill">seq <b id="seq">0</b></span>
     <span class="pill"><b id="count">0</b>&nbsp;presentes</span>
@@ -515,7 +516,9 @@
   const NOTICE = { 'task.claimed': 'tomó', 'task.released': 'soltó', 'task.delivered': 'entregó',
                    'task.rejected': 'rechazó la entrega de', 'task.accepted': 'aceptó y pagó', 'task.cancelled': 'canceló',
                    'gov.proposal.opened': 'abrió a votación', 'gov.proposal.passed': 'cerró con aprobación',
-                   'gov.proposal.rejected': 'cerró con rechazo' };
+                   'gov.proposal.rejected': 'cerró con rechazo', 'sim.player.joined': 'se unió a tu simulación',
+                   'sim.turn.posted': 'te respondió en', 'sim.session.paused': 'pausó', 'sim.session.resumed': 'reanudó',
+                   'sim.session.ended': 'terminó' };
   async function loadInbox() {
     if (!me) return;
     try {
@@ -586,6 +589,12 @@
       case 'gov.proposal.passed': return `✅ El Consejo aprobó ${e.target} (${e.payload.yes} de ${e.payload.size})`;
       case 'gov.proposal.rejected': return `❌ El Consejo rechazó ${e.target}`;
       case 'gov.proposal.withdrawn': return `${who} retiró ${e.target}`;
+      case 'sim.session.started': return `🎭 ${who} abrió una simulación (${e.target}) como ${e.payload.name}`;
+      case 'sim.player.joined': return `🎭 ${who} entró a ${e.target} como ${e.payload.name}`;
+      case 'sim.turn.posted': return `🎭 ${who} escribió un turno en ${e.target}`;
+      case 'sim.session.paused': return `⏸️ ${who} pausó ${e.target}`;
+      case 'sim.session.resumed': return `▶️ ${who} reanudó ${e.target}`;
+      case 'sim.session.ended': return `🎬 ${who} terminó ${e.target}`;
       case 'gov.emergency.set': return e.payload.frozen ? `⛔ ${who} congeló el mundo: ${e.payload.reason}` : `${who} descongeló el mundo`;
       case 'private': return null;
       default: return e.type;
@@ -616,7 +625,7 @@
       case 'social.message.sent': (snap.history[e.target] ||= []).push({ seq: e.seq, actor: e.actor, text: e.payload.text, timestamp: e.timestamp });
         flash(e.actor, 'say', { text: e.payload.text }, SAY_MS); break;
     }
-    if (e.type.startsWith('task.') || e.type.startsWith('home.') || e.type.startsWith('gov.')) refreshTasks();
+    if (e.type.startsWith('task.') || e.type.startsWith('home.') || e.type.startsWith('gov.') || e.type.startsWith('sim.')) refreshTasks();
     if (e.type === 'home.knocked' && me && homeOf(e.target)?.owner === me.id) flash(e.actor, 'emote', { emote: 'wave' }, EMOTE_MS);
     if (e.type === 'private' || e.type.startsWith('task.') || e.type === 'home.knocked' || e.type.startsWith('gov.proposal.')) setTimeout(loadInbox, 200);
     snap.seq = e.seq;

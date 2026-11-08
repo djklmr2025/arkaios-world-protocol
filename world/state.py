@@ -10,6 +10,7 @@ import governance as gov_rules
 import homes as home_rules
 import mail as mail_rules
 import movement
+import simulation as sim_rules
 import tasks as task_board
 
 ZONES = {'public_sandbox', 'trusted_collaboration', 'restricted',
@@ -68,6 +69,7 @@ class WorldState:
         self.mail = mail_rules.Mailboxes()
         self.homes = home_rules.Homes()
         self.council = gov_rules.Council()
+        self.sims = sim_rules.Simulations()
         self.scenes = {rid: movement.public_scene(room) for rid, room in definition['rooms'].items()}
 
     # ---------- queries ----------
@@ -97,6 +99,7 @@ class WorldState:
             **self.board.snapshot(self.entities),
             'homes': self.homes.snapshot(),
             **self.council.snapshot(self.entities),
+            **self.sims.snapshot(),
             'scenes': {rid: movement.scene_items(sc) for rid, sc in self.scenes.items()},
         }
 
@@ -169,6 +172,9 @@ class WorldState:
         }.get(kind)
         if handler is None and kind in task_board.ACTIONS:
             return self.board.decide(entity, action, self._require_joined(entity))
+        if kind in sim_rules.ACTIONS:
+            return self.sims.decide(entity, action, self.room(self._require_joined(entity)),
+                                    self.council.is_citizen)
         if kind == 'dm':
             return self.mail.decide_dm(entity, action, self._resolve(action.get('to')))
         if kind == 'dm_read':
@@ -178,7 +184,7 @@ class WorldState:
         if handler is None:
             raise Rejected('bad_action', 'action type must be join, move, status, say, leave, '
                            'emote, walk, knock, dm, dm_read, task_*, home_build, home_invite, home_uninvite, '
-                           'place, remove, propose, vote or withdraw')
+                           'place, remove, propose, vote, withdraw or sim_*')
         return handler(entity, action)
 
     def _decide_join(self, entity, action):
@@ -285,9 +291,11 @@ class WorldState:
             raise Rejected('zone_denied', 'observation-only room: watch, do not enter')
         if zone == 'trusted_collaboration' and TRUST_RANK[entity['trust_level']] < 1:
             raise Rejected('zone_denied', 'requires trust level trusted or core')
-        if room.get('council'):
+        if room.get('requires_law') and not any(room['requires_law'] in (l['proposal'], l['title']) for l in self.council.laws):
+            raise Rejected('zone_denied', 'the council has not approved this room yet')
+        if room.get('council') or (zone == 'simulation' and not room.get('allow')):
             if not self.council.can_enter(entity):
-                raise Rejected('zone_denied', 'the council room is for citizen agents (and human core observers)')
+                raise Rejected('zone_denied', 'only citizen agents (and human core observers) can enter')
         elif zone in ('restricted', 'simulation') and not set(entity['aliases']) & set(room['allow']):
             raise Rejected('zone_denied', 'not on this room\'s allow list')
         if len(self.occupants(room_id)) >= room['capacity']:
@@ -343,6 +351,8 @@ class WorldState:
         elif etype == 'home.knocked':
             home = self.homes.homes[target]
             self.mail.notify([home['owner']], event, {'id': target, 'title': home['name']})
+        elif etype.startswith('sim.'):
+            self._apply_sim(event)
         elif etype.startswith('gov.'):
             self._apply_gov(event)
         elif etype.startswith('home.'):
@@ -366,3 +376,11 @@ class WorldState:
             self.mail.notify(sorted({proposal['author'], proposal['target']} - {None}), event, ref)
             if etype == 'gov.proposal.passed' and proposal['level'] in ('suspend', 'expel'):
                 self.presence.pop(proposal['target'], None)
+
+    def _apply_sim(self, event):
+        self.sims.apply(event)
+        session = self.sims.sessions[event['target']]
+        partner = self.sims.partner(session, event['actor'])
+        if partner and event['type'] != 'sim.session.started':
+            title = sim_rules.STORIES[session['story']]['title']
+            self.mail.notify([partner], event, {'id': session['id'], 'title': title})

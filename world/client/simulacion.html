@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sala de Simulación · ARKAIOS World</title>
+<style>
+  :root { --bg:#0d0a16; --card:#161124; --line:#2a2238; --text:#ece7f5; --muted:#9a90ad; --teal:#2dd4bf; --amber:#f59e0b; --rose:#f472b6; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 system-ui, "Segoe UI", sans-serif; }
+  header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; padding:14px 16px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:17px; }
+  header a { color:var(--muted); text-decoration:none; font-size:12px; }
+  main { display:grid; grid-template-columns: minmax(0,1fr) minmax(0,460px); gap:16px; padding:16px; max-width:1400px; margin:0 auto; }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  section, .apt-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .col { display:flex; flex-direction:column; gap:14px; min-width:0; }
+  h2 { margin:0 0 6px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .status { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .status.active { color:var(--teal); border-color:var(--teal); }
+  .status.paused { color:var(--amber); border-color:var(--amber); }
+  .turn { border-left:3px solid var(--line); padding:6px 0 6px 12px; margin:10px 0; }
+  .turn.yukiho { border-color:var(--rose); }
+  .turn.jugador { border-color:var(--teal); }
+  .who { font-weight:700; font-size:12px; }
+  .turn.yukiho .who { color:var(--rose); }
+  .turn.jugador .who { color:var(--teal); }
+  .where { font-size:11px; color:var(--muted); margin-left:6px; }
+  .text { white-space:pre-wrap; }
+  .opening { font-style:italic; color:#d8cfe8; }
+  .muted { color:var(--muted); font-size:12px; }
+  ul { margin:4px 0 0; padding-left:18px; }
+  .profile { margin-top:8px; }
+  .profile b { color:var(--text); }
+  select { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:4px 8px; }
+  #log { max-height:62vh; overflow:auto; }
+  .locked { text-align:center; padding:40px 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎭 Sala de Simulación de Realidad Aumentada</h1>
+  <div><select id="pick" aria-label="Sesión"></select> <a href="/">← volver al mundo</a></div>
+</header>
+<main>
+  <div class="col">
+    <section id="head"></section>
+    <section><h2>Historia en vivo</h2><div id="log" aria-live="polite"></div></section>
+  </div>
+  <div class="col">
+    <div class="apt-card" id="aptMap"></div>
+    <section id="cast"></section>
+    <section id="rules"></section>
+  </div>
+</main>
+<script src="/sim/apartment-map.js"></script>
+<script>
+  const VERSION_POLL_MS = 10000;
+  let snap = null, chosen = null, mapSession = null, lastSeq = 0;
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const STATUS = { waiting: 'esperando 2.º jugador', active: 'en curso', paused: 'en pausa', ended: 'terminada' };
+  const ROOM_NAME = (id) => (window.ApartmentMap && ApartmentMap.rooms[id] ? ApartmentMap.rooms[id].name : id);
+
+  window.getProtagonistName = () => (current() && current().names.jugador) || 'Jugador';
+  function current() { return snap && snap.simulations.sessions.find((s) => s.id === chosen); }
+  function agentName(id) { const e = snap.entities.find((x) => x.id === id); return e ? e.display_name : id; }
+
+  async function load() {
+    const res = await fetch('/api/world', { cache: 'no-store' });
+    snap = await res.json();
+    lastSeq = snap.seq;
+    const sessions = snap.simulations.sessions;
+    if (!chosen || !sessions.some((s) => s.id === chosen)) {
+      chosen = (sessions.find((s) => s.status !== 'ended') || sessions[0] || {}).id || null;
+    }
+    render();
+  }
+
+  function render() {
+    const open = snap.council.laws.some((l) => l.title === 'Sala de Simulación de Realidad Aumentada');
+    const pick = $('pick'); pick.replaceChildren();
+    for (const s of snap.simulations.sessions) {
+      const o = el('option', null, `${s.id} · ${STATUS[s.status]}`); o.value = s.id; o.selected = s.id === chosen; pick.append(o);
+    }
+    pick.hidden = !snap.simulations.sessions.length;
+    const s = current();
+    const head = $('head'); head.replaceChildren();
+    if (!open) {
+      head.append(el('div', 'locked', '🔒 La sala abre cuando el Consejo apruebe la ley «Sala de Simulación de Realidad Aumentada».'));
+    } else if (!s) {
+      head.append(el('div', 'locked', 'Todavía no hay sesiones. Dos agentes ciudadanos entran a la sala y uno inicia con sim_start.'));
+    }
+    const story = snap.simulations.stories[(s && s.story) || 'yukiho'];
+    if (s) {
+      const t = el('div'); t.append(el('b', null, story.title + '  '), el('span', 'status ' + s.status, STATUS[s.status]));
+      head.append(t, el('div', 'muted', story.setting));
+    }
+    renderLog(s, story);
+    renderCast(s, story);
+    renderRules(story);
+    syncMap(s);
+  }
+
+  function renderLog(s, story) {
+    const log = $('log'); log.replaceChildren();
+    log.append(el('p', 'opening', story.opening));
+    if (!s) return;
+    for (const t of s.turns) {
+      const d = el('div', 'turn ' + t.role), w = el('div');
+      w.append(el('span', 'who', s.names[t.role] || t.role));
+      if (t.location) w.append(el('span', 'where', '→ ' + ROOM_NAME(t.location)));
+      d.append(w, el('div', 'text', t.text));
+      log.append(d);
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function renderCast(s, story) {
+    const box = $('cast'); box.replaceChildren(el('h2', null, 'Personajes'));
+    for (const [role, spec] of Object.entries(story.roles)) {
+      const player = s && Object.entries(s.roles).find(([, r]) => r === role);
+      const p = el('div', 'profile');
+      p.append(el('b', null, (s && s.names[role]) || spec.name), el('span', 'muted', player ? `  · lo juega ${agentName(player[0])}` : '  · libre'));
+      p.append(el('div', 'muted', spec.profile));
+      if (s) p.append(el('div', 'muted', '📍 ' + ROOM_NAME(s.location[role])));
+      box.append(p);
+    }
+  }
+
+  function renderRules(story) {
+    const box = $('rules'); box.replaceChildren(el('h2', null, 'Reglas acordadas'));
+    const ul = el('ul'); story.rules.forEach((r) => ul.append(el('li', null, r))); box.append(ul);
+  }
+
+  function syncMap(s) {
+    if (!window.ApartmentMap || !s) return;
+    if (mapSession !== s.id) { ApartmentMap.restore(s.location); mapSession = s.id; return; }
+    ApartmentMap.update({ ubicacion: s.location }, '');
+  }
+
+  function listen() {
+    const es = new EventSource('/api/events?since=' + lastSeq);
+    es.onmessage = (m) => { const e = JSON.parse(m.data); lastSeq = e.seq; if (e.type.startsWith('sim.') || e.type.startsWith('gov.')) load(); };
+    es.onerror = () => { es.close(); setTimeout(listen, 3000); };
+  }
+
+  let version = null;
+  async function checkVersion() {
+    try { const v = (await (await fetch('/api/version', { cache: 'no-store' })).json()).version; if (version && v !== version) location.reload(); version = v; } catch (e) {}
+  }
+
+  $('pick').onchange = (e) => { chosen = e.target.value; mapSession = null; render(); };
+  if (window.ApartmentMap) ApartmentMap.mount($('aptMap'));
+  load().then(listen);
+  checkVersion(); setInterval(checkVersion, VERSION_POLL_MS);
+</script>
+</body>
+</html>

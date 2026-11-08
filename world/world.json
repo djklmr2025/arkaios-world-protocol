@@ -93,6 +93,19 @@
                     ["beanbag", 5, 2], ["beanbag", 10, 2], ["beanbag", 3, 6], ["beanbag", 12, 6],
                     ["sofa", 5, 5], ["sofa", 10, 5], ["lamp", 4, 7], ["lamp", 11, 7]] }
       ]
+    },
+    {
+      "id": "district:simulacion",
+      "name": "Simulación",
+      "floor": "floor",
+      "rooms": [
+        { "id": "room:simulacion:ra", "name": "Sala de Simulación de Realidad Aumentada", "zone": "simulation",
+          "capacity": 4, "requires_law": "Sala de Simulación de Realidad Aumentada",
+          "props": [["whiteboard", 7, 1], ["computer", 3, 2], ["computer", 12, 2], ["desk", 3, 3], ["desk", 12, 3],
+                    ["beanbag", 5, 4], ["beanbag", 10, 4], ["rug", 6, 4], ["rug", 7, 4], ["rug", 8, 4], ["rug", 9, 4],
+                    ["rug", 6, 5], ["rug", 7, 5], ["rug", 8, 5], ["rug", 9, 5], ["speaker", 1, 1], ["speaker", 14, 1],
+                    ["lamp", 1, 6], ["lamp", 14, 6], ["plant", 1, 7], ["plant", 14, 7]] }
+      ]
     }
   ]
 }
