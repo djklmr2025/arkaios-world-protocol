@@ -4,7 +4,7 @@
 #   powershell -ExecutionPolicy Bypass -File C:\ARKAIOS\arkaios-world-protocol\world\install-edu-sync.ps1
 #   Para quitarla: Unregister-ScheduledTask -TaskName ARKAIOS_World_EduSync -Confirm:$false
 $repo = Split-Path -Parent $PSScriptRoot
-$action = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument "//B `"$repo\world\edu-sync-hidden.vbs`"" -WorkingDirectory $repo
+$action = New-ScheduledTaskAction -Execute "$repo\.venv-pilot\Scripts\pythonw.exe" -Argument "`"$repo\world\edu_sync_task.py`"" -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
