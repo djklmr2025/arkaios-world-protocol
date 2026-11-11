@@ -29,6 +29,7 @@ EDU_INBOX_URL = os.environ.get('EDU_INBOX_URL',
                                'https://educacion-libre-arkaios.vercel.app/api/task-inbox')
 LEDGER = Path(__file__).resolve().parent.parent / '.local-world' / 'edu-inbox.json'
 FETCH_TIMEOUT_S = 20
+HOOK_FETCH_TIMEOUT_S = 8
 MAX_FETCH_BYTES = 2_000_000
 REWARD = 1
 TITLE_PREFIX = 'Plantilla: '
@@ -49,12 +50,12 @@ def read_env(name: str) -> str:
     return value
 
 
-def fetch_requests(url: str = EDU_INBOX_URL, edu_key: str = '') -> list:
+def fetch_requests(url: str = EDU_INBOX_URL, edu_key: str = '', timeout: float = FETCH_TIMEOUT_S) -> list:
     headers = {'Accept': 'application/json', 'User-Agent': 'arkaios-world-edu-bridge'}
     if edu_key:
         headers['Authorization'] = 'Bearer ' + edu_key
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT_S) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = json.loads(resp.read(MAX_FETCH_BYTES + 1)[:MAX_FETCH_BYTES])
     if not isinstance(body, dict) or body.get('ok') is not True or not isinstance(body.get('tasks'), list):
         raise ValueError('unexpected task-inbox response')
@@ -140,6 +141,26 @@ def sync(items: list, client, ledger: dict, dry_run: bool = False) -> dict:
         ledger = {**ledger, item['id']: task_id}
         posted.append((item['id'], task_id, action['title']))
     return {'ledger': ledger, 'posted': posted, 'skipped': skipped, 'error': error}
+
+
+def sync_for_session(client) -> str:
+    """One quick sync at session start; returns a line for the session context, '' if nothing new."""
+    edu_key = read_env('ARKAIOS_EDU_AGENT_KEY')
+    if not edu_key:
+        return ''
+    try:
+        items = fetch_requests(edu_key=edu_key, timeout=HOOK_FETCH_TIMEOUT_S)
+    except (OSError, ValueError):
+        return 'Solicitudes de plantillas: no se pudo leer el buzón de Educación Libre ahora.'
+    result = sync(items, client, load_ledger())
+    save_ledger(result['ledger'])
+    if not result['posted'] and not result['error']:
+        return ''
+    lines = [f"Solicitudes de plantillas: {len(result['posted'])} nuevas en el tablero."]
+    lines += [f'- {task_id}: {title}' for _, task_id, title in result['posted'][:5]]
+    if result['error']:
+        lines.append('- Sincronización detenida: ' + result['error'])
+    return '\n'.join(lines)
 
 
 def main(argv=None) -> int:

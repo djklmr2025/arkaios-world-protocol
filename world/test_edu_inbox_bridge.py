@@ -93,6 +93,29 @@ class BridgeTests(unittest.TestCase):
         hostile = to_task(request(2, file={'id': '../../x?y=1', 'name': 'a.pdf', 'size': 1}))
         self.assertNotIn('action=file', hostile['description'])
 
+    def test_session_sync_reports_new_requests_and_survives_outages(self):
+        import edu_inbox_bridge as bridge
+        ledger_path = Path(self.tmp.name) / 'edu-inbox.json'
+        originals = (bridge.read_env, bridge.fetch_requests, bridge.LEDGER)
+        try:
+            bridge.read_env = lambda name: 'arkedu_ag_test'
+            bridge.LEDGER = ledger_path
+            bridge.load_ledger.__defaults__ = (ledger_path,)
+            bridge.save_ledger.__defaults__ = (ledger_path,)
+            bridge.fetch_requests = lambda **kw: [request(1)]
+            first = bridge.sync_for_session(self.client)
+            self.assertIn('1 nuevas', first)
+            self.assertEqual(bridge.sync_for_session(self.client), '')
+
+            def down(**kw):
+                raise OSError('offline')
+            bridge.fetch_requests = down
+            self.assertIn('no se pudo leer', bridge.sync_for_session(self.client))
+        finally:
+            bridge.read_env, bridge.fetch_requests, bridge.LEDGER = originals
+            bridge.load_ledger.__defaults__ = (originals[2],)
+            bridge.save_ledger.__defaults__ = (originals[2],)
+
     def test_dry_run_posts_nothing(self):
         result = sync([request(1)], self.client, {}, dry_run=True)
         self.assertEqual(len(result['posted']), 1)

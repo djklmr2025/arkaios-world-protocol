@@ -142,6 +142,16 @@ def sleep(client: Client, me: dict, world: dict) -> None:
     client.act(type='status', status='away', mood='sleeping', note='fuera de sesión')
 
 
+def edu_requests(client: Client) -> str:
+    """Bring new Educación Libre template requests onto the board (see edu_inbox_bridge.py)."""
+    try:
+        from edu_inbox_bridge import sync_for_session
+        line = sync_for_session(client)
+    except Exception:  # noqa: BLE001 - never break the session over the bridge
+        return ''
+    return line + '\n' if line else ''
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--agent', required=True)
@@ -167,6 +177,8 @@ def main(argv=None) -> int:
         world = client.call('GET', '/api/world')
         if args.event == 'start':
             sys.stdout.write(wake(client, me, world, stay) + '\n')
+            if args.agent.lower() == 'claude' and not stay:
+                sys.stdout.write(edu_requests(client))
         elif remaining == 0:
             sleep(client, me, world)
     except Exception:  # noqa: BLE001 - a hook must never break the session
