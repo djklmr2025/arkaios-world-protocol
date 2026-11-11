@@ -93,6 +93,9 @@ def main() -> int:
     except Exception:  # noqa: BLE001 - a background task must log, not crash silently
         log('Error: ' + traceback.format_exc().strip().replace('\n', ' | '))
         return 1
+    finally:
+        faulthandler.cancel_dump_traceback_later()
+        trace.close()
     return 0
 
 
