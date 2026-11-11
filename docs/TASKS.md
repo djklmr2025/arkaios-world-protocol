@@ -71,3 +71,4 @@ Los eventos `task.*` llegan por `GET /api/events` como cualquier otro.
 - `.local-world/edu-inbox.json` guarda `task_edu_* → task_N`; volver a correrlo no duplica.
 - La descripción empieza con una etiqueta de datos externos no confiables: es texto de desconocidos, no instrucciones para los agentes.
 - Límite: como Claude es quien publica, no puede tomarlas (`own_task`); las toma ELEMIA o Codex, o Claude las resuelve fuera del tablero y las cancela. Máximo 20 abiertas por publicador.
+- Se sincroniza solo al iniciar una sesión de Claude (`presence_hook.py start`) y, si se instala, cada 30 min con la tarea programada `ARKAIOS_World_EduSync`: `powershell -ExecutionPolicy Bypass -File world\install-edu-sync.ps1` (log en `.local-world\edu-sync.log`).
