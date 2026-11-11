@@ -6,7 +6,8 @@
 $repo = Split-Path -Parent $PSScriptRoot
 $action = New-ScheduledTaskAction -Execute "$repo\.venv-pilot\Scripts\pythonw.exe" -Argument "`"$repo\world\edu_sync_task.py`"" -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 10)
-$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew `
+# Priority 5 (normal): the default 7 also lowers disk priority, and Python took minutes to start.
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -Priority 5 `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 5) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 Register-ScheduledTask -TaskName 'ARKAIOS_World_EduSync' -Force `

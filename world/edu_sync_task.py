@@ -20,6 +20,7 @@ STATE = REPO / '.local-world'
 LOG = STATE / 'edu-sync.log'
 WORLD_VERSION_URL = 'http://127.0.0.1:4300/api/version'
 START_WAIT_S = 15
+HANG_DUMP_S = 90  # if a run hangs, write where it is stuck and exit
 DETACHED_PROCESS = 0x00000008
 CREATE_NEW_PROCESS_GROUP = 0x00000200
 CREATE_BREAKAWAY_FROM_JOB = 0x01000000
@@ -83,6 +84,9 @@ def sync_requests() -> None:
 
 
 def main() -> int:
+    import faulthandler
+    trace = LOG.open('a', encoding='utf-8')
+    faulthandler.dump_traceback_later(HANG_DUMP_S, exit=True, file=trace)
     try:
         if ensure_world():
             sync_requests()
