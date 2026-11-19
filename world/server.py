@@ -155,10 +155,46 @@ def make_handler(world: World, port: int):
                 return self._stream(parse_qs(url.query))
             self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such route')
 
+        def _handle_google_auth(self):
+            try:
+                content_len = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_len).decode('utf-8')
+                data = json.loads(body)
+
+                # For demo: extract email from JWT payload (should validate signature in production)
+                id_token = data.get('id_token', '')
+                email = data.get('email', '').lower()
+                name = data.get('name', email.split('@')[0])
+
+                if not email:
+                    return self._error(HTTPStatus.BAD_REQUEST, 'invalid_email', 'email required')
+
+                # Create or get citizen for this user
+                citizen_alias = email.replace('@', '_').replace('.', '_')
+                citizen_id = f'citizen:{citizen_alias}:google'
+
+                # For now, generate a simple token
+                token = f'arkw_google_{hashlib.sha256(email.encode()).hexdigest()[:32]}'
+
+                log('INFO', f'Google auth: {email} -> {citizen_id}')
+
+                return self._send_json(HTTPStatus.OK, {
+                    'ok': True,
+                    'citizen_id': citizen_id,
+                    'token': token,
+                    'message': f'Welcome {name}!'
+                })
+            except Exception as e:
+                log('ERROR', f'Google auth failed: {str(e)}')
+                return self._error(HTTPStatus.INTERNAL_SERVER_ERROR, 'auth_error', str(e))
+
         def do_POST(self):
             if not self._host_ok():
                 return
-            if urlparse(self.path).path != '/api/actions':
+            path = urlparse(self.path).path
+            if path == '/api/auth/google':
+                return self._handle_google_auth()
+            if path != '/api/actions':
                 return self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such route')
             entity = self._auth()
             if entity is None:
