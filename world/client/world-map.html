@@ -1112,28 +1112,23 @@
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
-    // 1) Draw terrain tiles with frustum culling
-    // Calculate visible bounds in grid coordinates
-    const margin = 4;
-    const minX = Math.max(0, Math.floor(cam.x / TILE_W) - margin);
-    const maxX = Math.min(MAP_W, Math.ceil(cam.x / TILE_W) + margin);
-    const minY = Math.max(0, Math.floor(cam.y / TILE_H) - margin);
-    const maxY = Math.min(MAP_H, Math.ceil(cam.y / TILE_H) + margin);
-
-    for (let y = minY; y < maxY; y++) {
-      for (let x = minX; x < maxX; x++) {
+    // 1) Draw terrain tiles with accurate isometric screen-space frustum culling
+    const halfW = (vw / 2) / cam.zoom + TILE_W * 2;
+    const halfH = (vh / 2) / cam.zoom + TILE_H * 2;
+    for (let y = 0; y < MAP_H; y++) {
+      for (let x = 0; x < MAP_W; x++) {
         const t = grid[y][x];
+        const p = toIso(x, y);
+        if (Math.abs(p.x - cam.x) > halfW || Math.abs(p.y - cam.y) > halfH) continue;
         if (t === 0) {
           // Occasional animated ocean wave sparkle
           if (((x * 13 + y * 7) % 17 === 0)) {
-            const p = toIso(x, y);
             const shimmer = Math.sin(now * 0.003 + x + y) * 3;
             ctx.fillStyle = 'rgba(186, 230, 253, 0.22)';
             ctx.fillRect(p.x - 6 + shimmer, p.y + 10, 12, 2);
           }
           continue;
         }
-        const p = toIso(x, y);
         const alt = (x + y) % 2 === 0;
         let col = '#52b788';
         if (t === 1) col = alt ? '#e9c46a' : '#e2ba5a';
