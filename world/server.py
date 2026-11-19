@@ -35,6 +35,7 @@ PAGES = {  # extra static files the client serves, with their content type
     '/simulacion': (HERE / 'client' / 'simulacion.html', 'text/html; charset=utf-8'),
     '/sim/apartment-map.js': (HERE / 'client' / 'apartment-map.js', 'application/javascript; charset=utf-8'),
     '/ecosystem': (HERE / 'client' / 'ecosystem-viewer.html', 'text/html; charset=utf-8'),
+    '/map': (HERE / 'client' / 'world-map.html', 'text/html; charset=utf-8'),
 }
 ASSETS_DIR = HERE / 'client' / 'assets'
 ASSET_RE = re.compile(r'^/assets/([a-z_]{1,24})\.png$')
