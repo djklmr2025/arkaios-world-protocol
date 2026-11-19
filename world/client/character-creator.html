@@ -160,9 +160,9 @@
       <p>Personaliza tu ciudadano para explorar ARKAIOS World</p>
     </div>
 
-    <section class="preview-box" id="previewBox" aria-live="polite">
+    <section class="preview-box" id="preview-container" aria-live="polite">
       <div class="avatar-wrap" id="avatarSvg"></div>
-      <div class="nameplate" id="previewName">Ciudadano</div>
+      <div class="nameplate" id="preview-name">Ciudadano</div>
       <div class="preview-sub" id="previewMeta">👨 Masculino · Listo para entrar</div>
     </section>
 
@@ -172,25 +172,25 @@
         <div class="gender-grid">
           <div class="gender-opt">
             <input type="radio" name="gender" id="g-m" value="M" checked>
-            <label for="g-m"><span class="ico">👨</span><span>Masculino</span></label>
+            <label for="g-m"><span class="ico">👨</span><span>Masculino (M)</span></label>
           </div>
           <div class="gender-opt">
             <input type="radio" name="gender" id="g-f" value="F">
-            <label for="g-f"><span class="ico">👩</span><span>Femenino</span></label>
+            <label for="g-f"><span class="ico">👩</span><span>Femenino (F)</span></label>
           </div>
           <div class="gender-opt">
             <input type="radio" name="gender" id="g-nb" value="NB">
-            <label for="g-nb"><span class="ico">🧑</span><span>Neutral</span></label>
+            <label for="g-nb"><span class="ico">🧑</span><span>Neutral (NB)</span></label>
           </div>
         </div>
       </div>
 
       <div class="section">
-        <label class="section-label" for="nameInput">2. Nombre de ciudadano</label>
+        <label class="section-label" for="nombre-input">2. Nombre de ciudadano</label>
         <div class="input-wrap">
           <input
             type="text"
-            id="nameInput"
+            id="nombre-input"
             name="name"
             minlength="3"
             maxlength="20"
@@ -199,14 +199,14 @@
           >
         </div>
         <div class="input-meta">
-          <span>3–20 caracteres (letras, números y espacios)</span>
+          <span id="statusHint">3–20 caracteres (alfanumérico + espacios)</span>
           <span id="charCount">0 / 20</span>
         </div>
         <div class="error-msg" id="errorMsg" role="alert"></div>
       </div>
 
       <div class="actions">
-        <button type="button" class="btn btn-back" id="btnBack">← Atrás</button>
+        <a class="btn btn-back" id="btnBack" href="/">← Atrás</a>
         <button type="button" class="btn btn-rand" id="btnRandom">🎲 Generar Aleatorio</button>
         <button type="submit" class="btn btn-enter" id="btnEnter">Entrar al Mundo →</button>
       </div>
@@ -230,11 +230,12 @@
 
   const VALID_NAME_RE = /^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü ]+$/;
 
-  const previewBox  = document.getElementById('previewBox');
+  const previewBox  = document.getElementById('preview-container');
   const avatarSvg   = document.getElementById('avatarSvg');
-  const previewName = document.getElementById('previewName');
+  const previewName = document.getElementById('preview-name');
   const previewMeta = document.getElementById('previewMeta');
-  const nameInput   = document.getElementById('nameInput');
+  const nameInput   = document.getElementById('nombre-input');
+  const statusHint  = document.getElementById('statusHint');
   const charCount   = document.getElementById('charCount');
   const errorMsg    = document.getElementById('errorMsg');
   const card        = document.getElementById('card');
@@ -310,10 +311,32 @@
 
   function validateName(raw) {
     const name = raw.trim();
-    if (name.length < 3) return 'El nombre debe tener al menos 3 caracteres.';
-    if (name.length > 20) return 'El nombre no puede superar los 20 caracteres.';
-    if (!VALID_NAME_RE.test(name)) return 'Usa solo letras, números y espacios (sin símbolos especiales).';
+    if (name.length < 3) return 'Mínimo 3 caracteres';
+    if (name.length > 20) return 'Máximo 20 caracteres';
+    if (!VALID_NAME_RE.test(name)) return 'Solo alphanumeric + espacios';
     return '';
+  }
+
+  function updateValidationVisual() {
+    if (!nameInput.value.trim()) {
+      nameInput.style.borderColor = 'rgba(96, 165, 250, 0.4)';
+      statusHint.style.color = '#94a3b8';
+      statusHint.textContent = '3–20 caracteres (alfanumérico + espacios)';
+      showError('');
+      return;
+    }
+    const err = validateName(nameInput.value);
+    if (err) {
+      nameInput.style.borderColor = '#ef4444';
+      statusHint.style.color = '#ef4444';
+      statusHint.textContent = err;
+      showError(err);
+    } else {
+      nameInput.style.borderColor = '#10b981';
+      statusHint.style.color = '#10b981';
+      statusHint.textContent = '✓ Nombre válido';
+      showError('');
+    }
   }
 
   function generateUUID() {
@@ -351,44 +374,36 @@
     r.addEventListener('change', updatePreview);
   });
   nameInput.addEventListener('input', () => {
-    showError('');
     updatePreview();
+    updateValidationVisual();
   });
 
-  document.getElementById('btnRandom').addEventListener('click', pickRandomName);
-  document.getElementById('btnBack').addEventListener('click', () => {
-    if (document.referrer && document.referrer.startsWith(window.location.origin)) {
-      window.history.back();
-    } else {
-      window.location.href = '/login';
-    }
+  document.getElementById('btnRandom').addEventListener('click', () => {
+    pickRandomName();
+    updateValidationVisual();
   });
 
   document.getElementById('creatorForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const err = validateName(nameInput.value);
     if (err) {
-      showError(err);
+      updateValidationVisual();
       nameInput.focus();
       return;
     }
     const gender = getGender();
     const name = nameInput.value.trim();
-    const session = {
-      gender,
-      name,
-      created_at: new Date().toISOString(),
-      session_id: generateUUID()
-    };
+    const sessionId = generateUUID();
 
     localStorage.setItem('arkaios_player_gender', gender);
     localStorage.setItem('arkaios_player_name', name);
-    localStorage.setItem('arkaios_player_session', JSON.stringify(session));
+    localStorage.setItem('arkaios_player_session', sessionId);
 
     window.location.href = '/map';
   });
 
   updatePreview();
+  nameInput.focus();
 })();
 </script>
 </body>
