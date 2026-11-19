@@ -294,7 +294,7 @@
 
 <div class="corner-portrait cp-bl" id="cp-elemia" data-char="elemia" style="--cp-border:#c084fc; --cp-glow:rgba(192,132,252,0.5); --cp-text:#f5d0fe;">
   <div class="cp-frame">
-    <div class="cp-face face-elemia"></div>
+    <video class="cp-video" src="/assets/elemia_loop.mp4" poster="/assets/portrait_elemia.webp" autoplay loop muted playsinline></video>
     <span class="cp-emote" id="em-elemia"></span>
     <div class="cp-name"><span>👸 ELEMIA</span><span class="cp-eq"><i></i><i></i><i></i></span></div>
   </div>
@@ -1035,6 +1035,7 @@
 
   // ===== 6. MAIN ANIMATION LOOP =====
   let lastT = performance.now();
+  let lastMiniRender = 0;
   function tick(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
@@ -1094,11 +1095,12 @@
       cam.y += (p.y - cam.y) * 0.08;
     }
 
-    render(now);
+    render(now, lastMiniRender);
+    lastMiniRender = now + 200; // Redraw minimap every 200ms
     requestAnimationFrame(tick);
   }
 
-  function render(now) {
+  function render(now, shouldRenderMinimap) {
     const vw = window.innerWidth, vh = window.innerHeight;
     // Ocean backdrop
     const sea = timeMode === 2 ? '#0b1d33' : (timeMode === 1 ? '#1e3a5f' : '#184e77');
@@ -1110,9 +1112,16 @@
     ctx.scale(cam.zoom, cam.zoom);
     ctx.translate(-cam.x, -cam.y);
 
-    // 1) Draw terrain tiles
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
+    // 1) Draw terrain tiles with frustum culling
+    // Calculate visible bounds in grid coordinates
+    const margin = 4;
+    const minX = Math.max(0, Math.floor(cam.x / TILE_W) - margin);
+    const maxX = Math.min(MAP_W, Math.ceil(cam.x / TILE_W) + margin);
+    const minY = Math.max(0, Math.floor(cam.y / TILE_H) - margin);
+    const maxY = Math.min(MAP_H, Math.ceil(cam.y / TILE_H) + margin);
+
+    for (let y = minY; y < maxY; y++) {
+      for (let x = minX; x < maxX; x++) {
         const t = grid[y][x];
         if (t === 0) {
           // Occasional animated ocean wave sparkle
@@ -1162,7 +1171,8 @@
       ctx.fillRect(0, 0, vw, vh);
     }
 
-    renderMinimap();
+    // Only redraw minimap every 200ms
+    if (now >= shouldRenderMinimap) renderMinimap();
   }
 
   function renderMinimap() {
