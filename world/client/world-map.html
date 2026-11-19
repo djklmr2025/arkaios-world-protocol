@@ -55,19 +55,120 @@
   }
   .row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
-  .bottom-left { bottom: 12px; left: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .bottom-left { bottom: 12px; left: 218px; display: flex; flex-direction: column; gap: 6px; }
   #minimap-wrap {
     background: rgba(14, 22, 36, 0.86);
     border: 2px solid rgba(116, 196, 255, 0.45);
     border-radius: 10px; padding: 6px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.45);
   }
-  canvas#minimap { display: block; width: 156px; height: 112px; cursor: pointer; border-radius: 5px; }
+  canvas#minimap { display: block; width: 146px; height: 104px; cursor: pointer; border-radius: 5px; }
   .hint { font-size: 10px; color: #9ec0df; text-align: center; margin-top: 3px; }
 
   .bottom-right {
-    bottom: 12px; right: 12px; width: 320px; max-width: calc(100vw - 24px);
+    bottom: 12px; right: 218px; width: 270px; max-width: calc(100vw - 440px);
     display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
+  }
+
+  /* ===== 4-CORNER ANIMATED JRPG CHARACTER PORTRAITS ===== */
+  .corner-portrait {
+    position: fixed; z-index: 15; width: 196px;
+    display: flex; flex-direction: column; gap: 5px;
+    cursor: pointer; transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  .corner-portrait:hover { transform: translateY(-2px); }
+  body.hide-portraits .corner-portrait { opacity: 0; pointer-events: none; }
+  body.hide-portraits .bottom-left { left: 12px; }
+  body.hide-portraits .bottom-right { right: 12px; }
+
+  .cp-tl { top: 56px; left: 12px; }
+  .cp-tr { top: 88px; right: 12px; }
+  .cp-bl { bottom: 12px; left: 12px; }
+  .cp-br { bottom: 12px; right: 12px; }
+
+  .cp-frame {
+    position: relative; width: 112px; height: 112px; border-radius: 14px;
+    overflow: hidden; border: 3px solid var(--cp-border, #74c4ff);
+    background: #0f172a;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6), 0 0 12px var(--cp-glow, rgba(116,196,255,0.25));
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .cp-tr .cp-frame, .cp-br .cp-frame { align-self: flex-end; }
+
+  .cp-face {
+    width: 100%; height: 100%;
+    background-image: url('/assets/hero_banner.webp');
+    background-repeat: no-repeat;
+    transform-origin: center bottom;
+    animation: idleBreathe 3.4s ease-in-out infinite;
+  }
+  .cp-video {
+    width: 100%; height: 100%; object-fit: cover; object-position: center top;
+    display: block; transform-origin: center bottom;
+    animation: idleBreathe 3.4s ease-in-out infinite;
+  }
+
+  /* Exact face crops from hero_banner.webp */
+  .face-arkaios { background-size: 460%; background-position: 10% 42%; }
+  .face-claude  { background-size: 460%; background-position: 38% 42%; }
+  .face-elemia  { background-size: 460%; background-position: 64% 46%; }
+
+  @keyframes idleBreathe {
+    0%, 100% { transform: scale(1.03) translateY(0px) rotate(0deg); }
+    50%      { transform: scale(1.06) translateY(-2px) rotate(0.6deg); }
+  }
+  @keyframes talkGesture {
+    0%, 100% { transform: scale(1.07) translateY(0px) rotate(-1.2deg); }
+    25%      { transform: scale(1.11) translateY(-4px) rotate(1.4deg); }
+    50%      { transform: scale(1.08) translateY(-1px) rotate(-0.8deg); }
+    75%      { transform: scale(1.12) translateY(-5px) rotate(1.1deg); }
+  }
+
+  .corner-portrait.speaking .cp-frame {
+    box-shadow: 0 0 22px var(--cp-border, #ffd970), 0 0 36px var(--cp-glow, rgba(255,217,112,0.65));
+    transform: scale(1.04);
+  }
+  .corner-portrait.speaking .cp-face,
+  .corner-portrait.speaking .cp-video {
+    animation: talkGesture 0.55s ease-in-out infinite;
+  }
+
+  .cp-name {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(8, 14, 26, 0.94) 45%);
+    padding: 12px 6px 4px; font-size: 11px; font-weight: bold;
+    color: var(--cp-text, #fff); display: flex; justify-content: space-between; align-items: center;
+  }
+  .cp-eq { display: none; gap: 2px; align-items: flex-end; height: 10px; }
+  .corner-portrait.speaking .cp-eq { display: flex; }
+  .cp-eq i {
+    display: block; width: 2px; background: var(--cp-border, #ffd970);
+    animation: eqBar 0.45s ease-in-out infinite alternate;
+  }
+  .cp-eq i:nth-child(2) { animation-delay: 0.15s; }
+  .cp-eq i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes eqBar { from { height: 2px; } to { height: 10px; } }
+
+  .cp-emote {
+    position: absolute; top: 5px; right: 6px; font-size: 18px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.8); display: none;
+  }
+  .cp-emote.show { display: block; }
+
+  .cp-speech {
+    background: rgba(12, 20, 36, 0.9);
+    border: 2px solid var(--cp-border, rgba(116,196,255,0.5));
+    border-radius: 10px; padding: 6px 9px; font-size: 11px; line-height: 1.38;
+    color: #eef5ff; box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+    backdrop-filter: blur(5px); max-height: 76px; overflow-y: auto;
+    word-break: break-word;
+  }
+  .cp-speech .cp-room { display: block; font-size: 9.5px; color: #9ec0df; margin-top: 2px; }
+
+  @media (max-width: 820px) {
+    .corner-portrait { width: 146px; }
+    .cp-frame { width: 82px; height: 82px; }
+    .bottom-left, .bottom-right { display: none; }
   }
   #chat-panel {
     width: 100%; background: rgba(14, 22, 36, 0.85);
@@ -127,6 +228,7 @@
   </div>
   <a class="btn" href="/">Vista Clásica</a>
   <a class="btn" href="/login">Login Google</a>
+  <button class="btn active" id="btn-portraits">🎭 Retratos</button>
   <button class="btn" id="btn-banner">✨ Equipo</button>
 </div>
 
@@ -168,6 +270,43 @@
       <div class="meta-list" id="modal-meta"></div>
     </div>
   </div>
+</div>
+
+<!-- 4-CORNER ANIMATED CHARACTER PORTRAITS WITH LIVE DIALOGUE -->
+<div class="corner-portrait cp-tl" id="cp-arkaios" data-char="arkaios" style="--cp-border:#fbbf24; --cp-glow:rgba(251,191,36,0.45); --cp-text:#fef08a;">
+  <div class="cp-frame">
+    <div class="cp-face face-arkaios"></div>
+    <span class="cp-emote" id="em-arkaios"></span>
+    <div class="cp-name"><span>👤 ARKAIOS</span><span class="cp-eq"><i></i><i></i><i></i></span></div>
+  </div>
+  <div class="cp-speech" id="sp-arkaios">Explorando la isla…<span class="cp-room" id="rm-arkaios">📍 Plaza Central</span></div>
+</div>
+
+<div class="corner-portrait cp-tr" id="cp-claude" data-char="claude" style="--cp-border:#38bdf8; --cp-glow:rgba(56,189,248,0.45); --cp-text:#e0f2fe;">
+  <div class="cp-frame">
+    <div class="cp-face face-claude"></div>
+    <span class="cp-emote" id="em-claude"></span>
+    <div class="cp-name"><span>🤖 Claude</span><span class="cp-eq"><i></i><i></i><i></i></span></div>
+  </div>
+  <div class="cp-speech" id="sp-claude">Listo en el Lobby.<span class="cp-room" id="rm-claude">📍 Plaza Central</span></div>
+</div>
+
+<div class="corner-portrait cp-bl" id="cp-elemia" data-char="elemia" style="--cp-border:#c084fc; --cp-glow:rgba(192,132,252,0.5); --cp-text:#f5d0fe;">
+  <div class="cp-frame">
+    <div class="cp-face face-elemia"></div>
+    <span class="cp-emote" id="em-elemia"></span>
+    <div class="cp-name"><span>👸 ELEMIA</span><span class="cp-eq"><i></i><i></i><i></i></span></div>
+  </div>
+  <div class="cp-speech" id="sp-elemia">¡Bienvenidos a ARKAIOS World!<span class="cp-room" id="rm-elemia">📍 Estudio de Agentes</span></div>
+</div>
+
+<div class="corner-portrait cp-br" id="cp-nina" data-char="nina" style="--cp-border:#60a5fa; --cp-glow:rgba(96,165,250,0.5); --cp-text:#eff6ff;">
+  <div class="cp-frame">
+    <video class="cp-video" src="/assets/nina_loop.mp4" poster="/assets/portrait_nina.webp" autoplay loop muted playsinline></video>
+    <span class="cp-emote" id="em-nina"></span>
+    <div class="cp-name"><span>🤖 NINA</span><span class="cp-eq"><i></i><i></i><i></i></span></div>
+  </div>
+  <div class="cp-speech" id="sp-nina">Monitoreando el ecosistema ✨<span class="cp-room" id="rm-nina">📍 Sala del Consejo</span></div>
 </div>
 
 <script>
@@ -1161,6 +1300,58 @@
     p.classList.toggle('collapsed');
     document.getElementById('chat-toggle').textContent = p.classList.contains('collapsed') ? '▲' : '▼';
   };
+
+  function updateCornerPortraits() {
+    const now = Date.now();
+    for (const a of actors.values()) {
+      const k = (a.name || '').toLowerCase();
+      const card = document.getElementById('cp-' + k);
+      if (!card) continue;
+      const rmEl = document.getElementById('rm-' + k);
+      const spEl = document.getElementById('sp-' + k);
+      const emEl = document.getElementById('em-' + k);
+      const b = allBuildings().find(x => x.id === a.room);
+      const roomLabel = b ? `${b.icon} ${b.name}` : `📍 ${(a.room || '').split(':').pop() || 'Isla'}`;
+      if (a.bubble && now < a.bubbleUntil) {
+        card.classList.add('speaking');
+        spEl.innerHTML = `${esc(a.bubble)}<span class="cp-room">${esc(roomLabel)}</span>`;
+      } else {
+        card.classList.remove('speaking');
+        const idleTxt = a.note || (a.bubble ? a.bubble : 'En línea en la isla');
+        spEl.innerHTML = `${esc(idleTxt)}<span class="cp-room">${esc(roomLabel)}</span>`;
+      }
+      if (emEl) {
+        if (a.emote && now < a.emoteUntil) {
+          emEl.textContent = a.emote; emEl.classList.add('show');
+        } else {
+          emEl.classList.remove('show');
+        }
+      }
+    }
+  }
+
+  // Click any corner portrait to follow that character on the map
+  document.querySelectorAll('.corner-portrait').forEach(el => {
+    el.addEventListener('click', () => {
+      const key = el.dataset.char;
+      for (const a of actors.values()) {
+        if ((a.name || '').toLowerCase() === key) {
+          cam.followId = (cam.followId === a.id) ? null : a.id;
+          const p = toIso(a.gx, a.gy);
+          cam.x = p.x; cam.y = p.y;
+          syncActors();
+          break;
+        }
+      }
+    });
+  });
+
+  document.getElementById('btn-portraits').onclick = (e) => {
+    document.body.classList.toggle('hide-portraits');
+    e.target.classList.toggle('active');
+  };
+
+  setInterval(updateCornerPortraits, 600);
 
   requestAnimationFrame(tick);
 })();
