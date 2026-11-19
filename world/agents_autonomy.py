@@ -169,7 +169,15 @@ class AgentsController:
             # Find the agent's entity ID from world state
             world = self.world_state_getter()
             agent_id = None
-            for eid, entity in world.get("entities", {}).items():
+            entities = world.get("entities", {})
+
+            # Handle both dict and list formats
+            if isinstance(entities, dict):
+                entity_items = entities.items()
+            else:
+                entity_items = [(e.get("id"), e) for e in entities] if entities else []
+
+            for eid, entity in entity_items:
                 if entity.get("display_name") == agent_name:
                     agent_id = eid
                     break

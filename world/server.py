@@ -333,7 +333,8 @@ def ensure_base_citizens(world: World) -> None:
 
     for name, cfg in base_citizens.items():
         # Check if citizen exists
-        exists = any(e.get('display_name') == name for e in entities.values())
+        entity_list = list(entities.values()) if isinstance(entities, dict) else (entities if isinstance(entities, list) else [])
+        exists = any(e.get('display_name') == name for e in entity_list)
         if not exists:
             try:
                 entity, key = world.register({
