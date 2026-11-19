@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mail import public_view  # noqa: E402
 from state import Rejected  # noqa: E402
 from store import World  # noqa: E402
+from agents_autonomy import AgentsController  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_DEFINITION = HERE / 'world.json'
@@ -45,6 +46,7 @@ RATE_WINDOW_S = 10.0
 RATE_MAX_ACTIONS = 20
 SSE_WAIT_S = 15.0
 BOOT_ID = format(time.time_ns(), 'x')
+agents_controller = None  # Global reference, set in main()
 
 
 def client_version() -> str:
@@ -78,7 +80,7 @@ def _allow_external() -> bool:
             or os.environ.get('ENVIRONMENT', '').lower() == 'production')
 
 
-def make_handler(world: World, port: int):
+def make_handler(world: World, port: int, agents_controller: AgentsController = None):
     allowed_hosts = {f'{LOOPBACK}:{port}', f'localhost:{port}'}
     allow_external = _allow_external()
     limiter = RateLimiter(RATE_WINDOW_S, RATE_MAX_ACTIONS)
@@ -138,6 +140,10 @@ def make_handler(world: World, port: int):
                 return self._send_json(HTTPStatus.OK, {'ok': True, 'version': client_version()})
             if url.path == '/api/world':
                 return self._send_json(HTTPStatus.OK, {'ok': True, **world.snapshot()})
+            if url.path == '/api/debug/agents':
+                if agents_controller:
+                    return self._send_json(HTTPStatus.OK, agents_controller.get_debug_state())
+                return self._send_json(HTTPStatus.SERVICE_UNAVAILABLE, {'ok': False, 'error': 'agents_not_ready'})
             if url.path == '/api/me':
                 entity = self._auth()
                 if entity:
@@ -297,9 +303,9 @@ def make_handler(world: World, port: int):
     return Handler
 
 
-def serve(world: World, port: int, host: str = None) -> ThreadingHTTPServer:
+def serve(world: World, port: int, host: str = None, agents_controller: AgentsController = None) -> ThreadingHTTPServer:
     bind_host = host if host is not None else ('0.0.0.0' if _allow_external() else LOOPBACK)
-    httpd = ThreadingHTTPServer((bind_host, port), make_handler(world, port))
+    httpd = ThreadingHTTPServer((bind_host, port), make_handler(world, port, agents_controller))
     httpd.daemon_threads = True
     httpd.stopping = False
     return httpd
@@ -311,6 +317,36 @@ def stop(httpd: ThreadingHTTPServer, world: World) -> None:
         world.cond.notify_all()
     httpd.shutdown()
     httpd.server_close()
+
+
+def ensure_base_citizens(world: World) -> None:
+    """Ensure base 4 citizens exist (for Render cold-start)."""
+    snapshot = world.snapshot()
+    entities = snapshot.get('entities', {})
+
+    base_citizens = {
+        'Arkaios': {'type': 'human', 'owner': 'Arkaios', 'trust': 'core'},
+        'Claude': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['coding']},
+        'ELEMIA': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['graphics']},
+        'NINA': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['monitoring']},
+    }
+
+    for name, cfg in base_citizens.items():
+        # Check if citizen exists
+        exists = any(e.get('display_name') == name for e in entities.values())
+        if not exists:
+            try:
+                entity, key = world.register({
+                    'type': cfg['type'],
+                    'display_name': name,
+                    'owner': cfg['owner'],
+                    'aliases': [name.lower()],
+                    'trust_level': cfg['trust'],
+                    'capabilities': cfg.get('caps', [])
+                })
+                sys.stderr.write(f'[BOOT] Registered {name}: {entity["id"]}\n')
+            except Exception as e:
+                sys.stderr.write(f'[BOOT] Failed to register {name}: {e}\n')
 
 
 def main(argv=None) -> int:
@@ -341,14 +377,25 @@ def main(argv=None) -> int:
     world = World(args.state, args.world)
     try:
         if args.cmd == 'serve':
+            ensure_base_citizens(world)
             bind_host = args.host if args.host is not None else ('0.0.0.0' if _allow_external() else LOOPBACK)
-            httpd = serve(world, args.port, bind_host)
+
+            # Create and start agents controller
+            global agents_controller
+            agents_controller = AgentsController(
+                world_state_getter=lambda: world.snapshot(),
+                action_executor=lambda eid, act: world.act(eid, act)
+            )
+            agents_controller.start()
+
+            httpd = serve(world, args.port, bind_host, agents_controller)
             sys.stderr.write(f'ARKAIOS WORLD on http://{bind_host}:{args.port} (seq {world.state.seq})\n')
             try:
                 httpd.serve_forever()
             except KeyboardInterrupt:
                 pass
             finally:
+                agents_controller.stop()
                 stop(httpd, world)
         elif args.cmd == 'register':
             entity, key = world.register({
