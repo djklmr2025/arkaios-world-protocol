@@ -127,6 +127,7 @@
   </div>
   <a class="btn" href="/">Vista Clásica</a>
   <a class="btn" href="/login">Login Google</a>
+  <button class="btn" id="btn-banner">✨ Equipo</button>
 </div>
 
 <div class="hud top-right">
@@ -647,41 +648,172 @@
     }
   }
 
+  function drawCustomChibi(name, x, y, dir, frame, now) {
+    const key = (name || '').toLowerCase();
+    if (!['arkaios', 'claude', 'elemia', 'nina'].includes(key)) return false;
+
+    const p = 2; // 2px crisp pixel unit
+    const bob = (frame === 1 || frame === 3) ? -2 : 0;
+    const legL = (frame === 1) ? -2 : (frame === 3 ? 2 : 0);
+    const legR = -legL;
+    const ox = Math.round(x);
+    const oy = Math.round(y + bob);
+    const px = (dx, dy, w, h, col) => {
+      ctx.fillStyle = col;
+      ctx.fillRect(ox + dx * p, oy + dy * p, w * p, h * p);
+    };
+
+    if (key === 'arkaios') {
+      // ARKAIOS: Dark brown spiky hair, navy-blue & gold armor coat, golden shoulder pauldrons
+      px(-3, -3 + legL * 0.5, 2, 3, '#1e293b'); // left boot
+      px(1,  -3 + legR * 0.5, 2, 3, '#1e293b'); // right boot
+      px(-4, -10, 8, 7, '#1b2a4a');             // navy royal coat
+      px(-1, -10, 2, 7, '#f5c542');             // gold center trim
+      px(-6, -10, 3, 3, '#f5c542');             // left golden pauldron
+      px(3,  -10, 3, 3, '#eab308');             // right golden pauldron
+      px(-5, -11, 2, 1, '#fef08a');             // pauldron shine
+      px(-4, -17, 8, 7, '#f5cba7');             // face
+      if (dir !== 1) {
+        px(-2, -14, 1, 2, '#5c3317');           // left brown eye
+        px(1,  -14, 1, 2, '#5c3317');           // right brown eye
+      }
+      px(-5, -20, 10, 4, '#2b1810');            // spiky dark brown hair
+      px(-4, -21, 3, 2, '#3d2317');             // hair spike L
+      px(0,  -21, 4, 2, '#2b1810');             // hair spike R
+      px(-5, -17, 1, 4, '#2b1810');             // side hair L
+      px(4,  -17, 1, 4, '#2b1810');             // side hair R
+      return true;
+    }
+
+    if (key === 'claude') {
+      // CLAUDE: Sleek white & royal-blue cybernetic android, side antenna, glowing cyan core
+      px(-3, -3 + legL * 0.5, 2, 3, '#1e3a8a'); // left leg
+      px(1,  -3 + legR * 0.5, 2, 3, '#1e3a8a'); // right leg
+      px(-4, -10, 8, 7, '#e2e8f0');             // white android chassis
+      px(-3, -9,  6, 5, '#2563eb');             // royal blue chest armor
+      px(-1, -8,  2, 2, '#38bdf8');             // glowing cyan core
+      px(-6, -10, 2, 5, '#cbd5e1');             // left arm
+      px(4,  -10, 2, 5, '#cbd5e1');             // right arm
+      px(-4, -17, 8, 7, '#f1f5f9');             // metallic white head
+      px(-4, -18, 8, 2, '#cbd5e1');             // helmet crown
+      px(-1, -18, 2, 2, '#3b82f6');             // blue forehead strip
+      px(-5, -16, 1, 3, '#1e293b');             // ear sensor L
+      px(4,  -16, 1, 3, '#1e293b');             // ear sensor R
+      px(-5, -21, 1, 5, '#94a3b8');             // antenna
+      px(-5, -22, 1, 1, '#38bdf8');             // glowing antenna tip
+      if (dir !== 1) {
+        px(-2, -14, 1, 2, '#38bdf8');           // cyan eye L
+        px(1,  -14, 1, 2, '#38bdf8');           // cyan eye R
+      }
+      return true;
+    }
+
+    if (key === 'elemia') {
+      // ELEMIA: Long flowing lavender/silver hair, ornate gold tiara, royal purple & gold dress/cape
+      const sway = Math.round(Math.sin(now * 0.005) * 0.6);
+      px(-6 + sway, -15, 12, 12, '#c4b5fd');    // long flowing lavender back hair
+      px(-5, -10, 10, 8, '#581c87');            // royal purple gown & cape
+      px(-3, -10, 6, 8, '#6d28d9');             // bright violet bodice
+      px(-1, -9,  2, 6, '#fbbf24');             // golden embroidery
+      px(-5, -10, 2, 2, '#fbbf24');             // gold shoulder accent L
+      px(3,  -10, 2, 2, '#fbbf24');             // gold shoulder accent R
+      px(-2, -2 + legL * 0.4, 2, 2, '#3b0764'); // shoe L
+      px(0,  -2 + legR * 0.4, 2, 2, '#3b0764'); // shoe R
+      px(-4, -17, 8, 7, '#fde2d2');             // face
+      if (dir !== 1) {
+        px(-2, -14, 1, 2, '#7c3aed');           // violet eye L
+        px(1,  -14, 1, 2, '#7c3aed');           // violet eye R
+      }
+      px(-5, -19, 10, 3, '#ddd6fe');            // lavender bangs
+      px(-5, -17, 1, 7, '#d8b4fe');             // hair lock L
+      px(4,  -17, 1, 7, '#d8b4fe');             // hair lock R
+      // Ornate golden tiara
+      px(-3, -20, 6, 1, '#fbbf24');
+      px(-1, -22, 2, 2, '#f59e0b');
+      px(0,  -21, 1, 1, '#c084fc');             // amethyst gem
+      return true;
+    }
+
+    if (key === 'nina') {
+      // NINA: Long royal-blue hair, round glasses, white turtleneck sweater, glowing blue cyber headset
+      px(-6, -15, 12, 11, '#2563eb');           // long blue back hair
+      px(-3, -3 + legL * 0.5, 2, 3, '#334155'); // leg L
+      px(1,  -3 + legR * 0.5, 2, 3, '#334155'); // leg R
+      px(-4, -10, 8, 7, '#f1f5f9');             // cozy white turtleneck sweater
+      px(-3, -11, 6, 2, '#e2e8f0');             // turtleneck collar
+      px(-1, -9,  2, 1, '#38bdf8');             // tech collar jewel
+      px(-5, -9,  1, 5, '#e2e8f0');             // sleeve L
+      px(4,  -9,  1, 5, '#e2e8f0');             // sleeve R
+      px(-4, -17, 8, 7, '#fde2d2');             // face
+      if (dir !== 1) {
+        px(-3, -14, 2, 1, '#1e3a8a');           // happy closed-eye smile L
+        px(1,  -14, 2, 1, '#1e3a8a');           // happy closed-eye smile R
+        // Delicate round glasses frame
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1;
+        ctx.strokeRect(ox - 3 * p, oy - 15 * p, 2.5 * p, 2.5 * p);
+        ctx.strokeRect(ox + 0.5 * p, oy - 15 * p, 2.5 * p, 2.5 * p);
+      }
+      px(-5, -19, 10, 3, '#3b82f6');            // blue bangs
+      px(-5, -17, 1, 8, '#3b82f6');             // blue side hair L
+      px(4,  -17, 1, 8, '#3b82f6');             // blue side hair R
+      // Cyber headset on right side
+      px(4,  -17, 2, 4, '#cbd5e1');
+      px(5,  -16, 1, 2, '#38bdf8');             // glowing cyan LED
+      return true;
+    }
+    return false;
+  }
+
+  const NAMEPLATE_THEME = {
+    arkaios: { bg: 'rgba(120, 74, 16, 0.92)',  border: '#fbbf24', text: '#fef08a' },
+    claude:  { bg: 'rgba(23, 62, 118, 0.92)',  border: '#60a5fa', text: '#e0f2fe' },
+    elemia:  { bg: 'rgba(88, 28, 135, 0.92)',  border: '#d8b4fe', text: '#f5d0fe' },
+    nina:    { bg: 'rgba(30, 64, 125, 0.92)',  border: '#93c5fd', text: '#eff6ff' },
+  };
+
   function drawActor(a, now) {
     const p = toIso(a.gx, a.gy);
     const x = p.x, y = p.y + TILE_H / 2;
 
     // Ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.32)';
-    ctx.beginPath(); ctx.ellipse(x, y + 2, 11, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.34)';
+    ctx.beginPath(); ctx.ellipse(x, y + 2, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Real pixel-art sprite sheet (4x4 grid)
-    const sheet = sprites[charForEntity(a.id)];
-    if (sheet && sheet.complete && sheet.naturalWidth > 0) {
-      const fw = sheet.naturalWidth / 4;
-      const fh = sheet.naturalHeight / 4;
-      const drawW = 36, drawH = 36 * (fh / fw);
-      ctx.drawImage(sheet, a.frame * fw, a.dir * fh, fw, fh, Math.round(x - drawW / 2), Math.round(y - drawH + 4), drawW, drawH);
-    } else {
-      ctx.fillStyle = '#ffd970';
-      ctx.beginPath(); ctx.arc(x, y - 14, 9, 0, Math.PI * 2); ctx.fill();
+    // Custom chibi pixel-art matching official banner for Arkaios, Claude, ELEMIA & NINA
+    const drewCustom = drawCustomChibi(a.name, x, y, a.dir, a.frame, now);
+    if (!drewCustom) {
+      const sheet = sprites[charForEntity(a.id)];
+      if (sheet && sheet.complete && sheet.naturalWidth > 0) {
+        const fw = sheet.naturalWidth / 4;
+        const fh = sheet.naturalHeight / 4;
+        const drawW = 36, drawH = 36 * (fh / fw);
+        ctx.drawImage(sheet, a.frame * fw, a.dir * fh, fw, fh, Math.round(x - drawW / 2), Math.round(y - drawH + 4), drawW, drawH);
+      } else {
+        ctx.fillStyle = '#ffd970';
+        ctx.beginPath(); ctx.arc(x, y - 14, 9, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
-    // Nameplate
+    // Ornate RPG Nameplate matching each character's banner plaque
     const badge = a.type === 'human' ? '👤' : (a.name === 'ELEMIA' ? '👸' : '🤖');
     const tag = `${badge} ${a.name}`;
+    const theme = NAMEPLATE_THEME[(a.name || '').toLowerCase()] || { bg: 'rgba(12, 20, 34, 0.84)', border: '#74c4ff', text: '#f4f7fb' };
     ctx.font = 'bold 10px monospace';
-    const tw = ctx.measureText(tag).width + 10;
-    ctx.fillStyle = cam.followId === a.id ? 'rgba(255, 217, 112, 0.92)' : 'rgba(12, 20, 34, 0.82)';
-    ctx.fillRect(x - tw / 2, y + 6, tw, 15);
-    ctx.fillStyle = cam.followId === a.id ? '#101828' : '#f4f7fb';
+    const tw = ctx.measureText(tag).width + 12;
+    const isFollowed = cam.followId === a.id;
+    ctx.fillStyle = isFollowed ? 'rgba(255, 217, 112, 0.96)' : theme.bg;
+    ctx.fillRect(x - tw / 2, y + 6, tw, 16);
+    ctx.strokeStyle = isFollowed ? '#ffffff' : theme.border;
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(x - tw / 2, y + 6, tw, 16);
+    ctx.fillStyle = isFollowed ? '#101828' : theme.text;
     ctx.textAlign = 'center';
     ctx.fillText(tag, x, y + 17);
 
     // Emote popup
     if (a.emote && now < a.emoteUntil) {
       ctx.font = '16px sans-serif';
-      ctx.fillText(a.emote, x, y - 42 - Math.sin(now * 0.01) * 3);
+      ctx.fillText(a.emote, x, y - 48 - Math.sin(now * 0.01) * 3);
     }
 
     // Pixel speech bubble
@@ -689,9 +821,9 @@
       const txt = a.bubble.length > 48 ? a.bubble.slice(0, 47) + '…' : a.bubble;
       ctx.font = '10px monospace';
       const bw = Math.min(220, ctx.measureText(txt).width + 14);
-      const bx = x - bw / 2, by = y - 62;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1.5;
+      const bx = x - bw / 2, by = y - 68;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+      ctx.strokeStyle = theme.border; ctx.lineWidth = 1.5;
       ctx.fillRect(bx, by, bw, 20); ctx.strokeRect(bx, by, bw, 20);
       ctx.fillStyle = '#0f172a';
       ctx.fillText(txt, x, by + 13);
@@ -1000,6 +1132,23 @@
 
   document.getElementById('modal-close').onclick = () => document.getElementById('modal').classList.remove('open');
   document.getElementById('modal').onclick = (e) => { if (e.target.id === 'modal') e.target.classList.remove('open'); };
+  document.getElementById('btn-banner').onclick = () => {
+    document.getElementById('modal-title').textContent = '✨ Ciudadanos Fundadores — ARKAIOS World';
+    const ic = document.getElementById('interior');
+    const ictx = ic.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ictx.imageSmoothingEnabled = true;
+      ictx.fillStyle = '#132033'; ictx.fillRect(0, 0, ic.width, ic.height);
+      const scale = Math.min(ic.width / img.width, ic.height / img.height);
+      const dw = img.width * scale, dh = img.height * scale;
+      ictx.drawImage(img, (ic.width - dw) / 2, (ic.height - dh) / 2, dw, dh);
+    };
+    img.src = '/assets/hero_banner.webp';
+    document.getElementById('modal-meta').textContent =
+      'ARKAIOS (Fundador) · Claude (Androide) · ELEMIA (Princesa & Constructora) · NINA (Monitoreo del Ecosistema)';
+    document.getElementById('modal').classList.add('open');
+  };
   document.getElementById('btn-zoom-in').onclick = () => { cam.zoom = Math.min(2.4, cam.zoom * 1.2); };
   document.getElementById('btn-zoom-out').onclick = () => { cam.zoom = Math.max(0.55, cam.zoom * 0.84); };
   document.getElementById('btn-center').onclick = () => { cam.x = 0; cam.y = MAP_H * TILE_H * 0.48; cam.zoom = 1.15; cam.followId = null; };

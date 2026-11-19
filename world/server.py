@@ -39,7 +39,7 @@ PAGES = {  # extra static files the client serves, with their content type
     '/map': (HERE / 'client' / 'world-map.html', 'text/html; charset=utf-8'),
 }
 ASSETS_DIR = HERE / 'client' / 'assets'
-ASSET_RE = re.compile(r'^/assets/([a-z_]{1,24})\.png$')
+ASSET_RE = re.compile(r'^/assets/([a-z_]{1,24})\.(png|webp)$')
 LOOPBACK = '127.0.0.1'
 MAX_BODY = 4096
 RATE_WINDOW_S = 10.0
@@ -135,7 +135,8 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
             if url.path in PAGES:
                 return self._serve_client(*PAGES[url.path])
             if ASSET_RE.match(url.path):
-                return self._serve_asset(ASSET_RE.match(url.path).group(1))
+                m = ASSET_RE.match(url.path)
+                return self._serve_asset(m.group(1), m.group(2))
             if url.path == '/api/version':
                 return self._send_json(HTTPStatus.OK, {'ok': True, 'version': client_version()})
             if url.path == '/api/world':
@@ -254,8 +255,8 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
             self.end_headers()
             self.wfile.write(data)
 
-        def _serve_asset(self, name):
-            path = ASSETS_DIR / f'{name}.png'
+        def _serve_asset(self, name, ext='png'):
+            path = ASSETS_DIR / f'{name}.{ext}'
             if not path.is_file():
                 return self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such asset')
             st = path.stat()
@@ -268,7 +269,7 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
                 return
             data = path.read_bytes()
             self.send_response(HTTPStatus.OK)
-            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Type', 'image/webp' if ext == 'webp' else 'image/png')
             self.send_header('Content-Length', str(len(data)))
             self.send_header('Cache-Control', 'no-cache')
             self.send_header('ETag', etag)
