@@ -118,6 +118,8 @@ def make_handler(world: World, port: int):
             url = urlparse(self.path)
             if url.path in ('/', '/index.html'):
                 return self._serve_client()
+            if url.path == '/login':
+                return self._serve_client(HERE / 'client' / 'login.html', 'text/html; charset=utf-8')
             if url.path in PAGES:
                 return self._serve_client(*PAGES[url.path])
             if ASSET_RE.match(url.path):

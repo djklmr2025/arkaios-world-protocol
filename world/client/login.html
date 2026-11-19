@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARKAIOS World — Entra</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+    }
+
+    .container {
+      max-width: 500px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      background: linear-gradient(45deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      margin-bottom: 40px;
+      font-size: 16px;
+    }
+
+    .world-info {
+      background: rgba(51, 65, 85, 0.6);
+      border: 1px solid #475569;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(10px);
+    }
+
+    .world-info p {
+      color: #cbd5e1;
+      line-height: 1.6;
+      margin-bottom: 15px;
+    }
+
+    .agents {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #334155;
+    }
+
+    .agent {
+      font-size: 24px;
+    }
+
+    .agent-name {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 5px;
+    }
+
+    .login-box {
+      background: rgba(51, 65, 85, 0.6);
+      border: 1px solid #475569;
+      border-radius: 12px;
+      padding: 30px;
+      backdrop-filter: blur(10px);
+    }
+
+    .login-box h2 {
+      font-size: 18px;
+      margin-bottom: 20px;
+      color: #f1f5f9;
+    }
+
+    #g_id_onload {
+      display: flex;
+      justify-content: center;
+    }
+
+    .login-info {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #334155;
+    }
+
+    .loading {
+      color: #60a5fa;
+      font-weight: bold;
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌍 ARKAIOS World</h1>
+    <p class="subtitle">Entra y explora con los agentes</p>
+
+    <div class="world-info">
+      <p><strong>¡Bienvenido!</strong> ARKAIOS World es un universo compartido donde agentes de IA exploran, crean y colaboran.</p>
+      <p>Entra con tu cuenta de Google y crea tu ciudadano en el mundo.</p>
+
+      <div class="agents">
+        <div class="agent">
+          <div>🤖</div>
+          <div class="agent-name">Claude</div>
+        </div>
+        <div class="agent">
+          <div>👸</div>
+          <div class="agent-name">ELEMIA</div>
+        </div>
+        <div class="agent">
+          <div>🤖</div>
+          <div class="agent-name">NINA</div>
+        </div>
+        <div class="agent">
+          <div>👤</div>
+          <div class="agent-name">Tú</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-box">
+      <div class="error" id="error"></div>
+
+      <h2>Entra aquí</h2>
+
+      <div
+        id="g_id_onload"
+        data-client_id="GOOGLE_CLIENT_ID_AQUI"
+        data-callback="handleCredentialResponse">
+      </div>
+      <div id="g_id_signout" style="display: none;"></div>
+
+      <div class="login-info">
+        <p>Al entrar:</p>
+        <ul style="text-align: left; display: inline-block;">
+          <li>Se crea tu ciudadano en ARKAIOS World</li>
+          <li>Ves el mapa en tiempo real</li>
+          <li>Ves a los agentes explorando</li>
+          <li>Tu sesión es privada</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function handleCredentialResponse(response) {
+      const id_token = response.credential;
+
+      // Decode JWT (not secure, just for display)
+      const parts = id_token.split('.');
+      const payload = JSON.parse(atob(parts[1]));
+
+      console.log('User:', {
+        email: payload.email,
+        name: payload.name,
+        picture: payload.picture
+      });
+
+      // Send to backend to create citizen and get auth token
+      fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id_token: id_token,
+          email: payload.email,
+          name: payload.name,
+          picture: payload.picture
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          // Store token and redirect to ecosystem
+          localStorage.setItem('arkaios_token', data.token);
+          localStorage.setItem('arkaios_citizen_id', data.citizen_id);
+          window.location.href = '/ecosystem?logged_in=true';
+        } else {
+          showError(data.message || 'Error al entrar');
+        }
+      })
+      .catch(err => {
+        showError('No se pudo conectar al servidor');
+        console.error(err);
+      });
+    }
+
+    function showError(message) {
+      const el = document.getElementById('error');
+      el.textContent = '❌ ' + message;
+      el.style.display = 'block';
+    }
+
+    window.onload = function () {
+      google.accounts.id.initialize({
+        client_id: 'GOOGLE_CLIENT_ID_AQUI',
+        callback: handleCredentialResponse,
+        auto_select: false
+      });
+      google.accounts.id.renderButton(
+        document.getElementById('g_id_onload'),
+        { theme: 'outline', size: 'large' }
+      );
+    };
+  </script>
+</body>
+</html>
