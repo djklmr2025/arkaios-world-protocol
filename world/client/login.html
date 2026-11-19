@@ -201,10 +201,10 @@
       .then(r => r.json())
       .then(data => {
         if (data.ok) {
-          // Store token and redirect to ecosystem
+          // Store token and redirect to map
           localStorage.setItem('arkaios_token', data.token);
           localStorage.setItem('arkaios_citizen_id', data.citizen_id);
-          window.location.href = '/ecosystem?logged_in=true';
+          window.location.href = '/map?logged_in=true';
         } else {
           showError(data.message || 'Error al entrar');
         }
