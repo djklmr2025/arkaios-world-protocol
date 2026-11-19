@@ -3,3 +3,5 @@
 __pycache__/
 .music-source/
 .local-world/
+.local-world-backup*/
+TOKENS_FOR_NINA.md

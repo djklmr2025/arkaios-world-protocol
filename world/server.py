@@ -14,6 +14,7 @@ import hashlib
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 import re
 from pathlib import Path
 import sys
@@ -71,8 +72,14 @@ class RateLimiter:
             return True
 
 
+def _allow_external() -> bool:
+    return (os.environ.get('ALLOW_EXTERNAL', '').lower() in ('1', 'true', 'yes')
+            or os.environ.get('ENVIRONMENT', '').lower() == 'production')
+
+
 def make_handler(world: World, port: int):
     allowed_hosts = {f'{LOOPBACK}:{port}', f'localhost:{port}'}
+    allow_external = _allow_external()
     limiter = RateLimiter(RATE_WINDOW_S, RATE_MAX_ACTIONS)
 
     class Handler(BaseHTTPRequestHandler):
@@ -98,6 +105,8 @@ def make_handler(world: World, port: int):
             self._send_json(status, {'ok': False, 'error': code, 'message': message})
 
         def _host_ok(self) -> bool:
+            if allow_external:
+                return True
             # Blocks DNS-rebinding: browsers send the attacker's hostname here.
             if self.headers.get('Host') in allowed_hosts:
                 return True
@@ -176,7 +185,7 @@ def make_handler(world: World, port: int):
                 # For now, generate a simple token
                 token = f'arkw_google_{hashlib.sha256(email.encode()).hexdigest()[:32]}'
 
-                log('INFO', f'Google auth: {email} -> {citizen_id}')
+                sys.stderr.write(f'[INFO] Google auth: {email} -> {citizen_id}\n')
 
                 return self._send_json(HTTPStatus.OK, {
                     'ok': True,
@@ -185,7 +194,7 @@ def make_handler(world: World, port: int):
                     'message': f'Welcome {name}!'
                 })
             except Exception as e:
-                log('ERROR', f'Google auth failed: {str(e)}')
+                sys.stderr.write(f'[ERROR] Google auth failed: {str(e)}\n')
                 return self._error(HTTPStatus.INTERNAL_SERVER_ERROR, 'auth_error', str(e))
 
         def do_POST(self):
@@ -224,9 +233,17 @@ def make_handler(world: World, port: int):
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(data)))
             self.send_header('Cache-Control', 'no-cache')
-            self.send_header('Content-Security-Policy',
-                             "default-src 'self'; style-src 'self' 'unsafe-inline'; "
-                             "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
+            if path.name == 'login.html':
+                csp = ("default-src 'self'; "
+                       "style-src 'self' 'unsafe-inline' https://accounts.google.com; "
+                       "script-src 'self' 'unsafe-inline' https://accounts.google.com; "
+                       "frame-src https://accounts.google.com; "
+                       "connect-src 'self' https://accounts.google.com; "
+                       "frame-ancestors 'none'")
+            else:
+                csp = ("default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                       "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'")
+            self.send_header('Content-Security-Policy', csp)
             self.end_headers()
             self.wfile.write(data)
 
@@ -279,8 +296,9 @@ def make_handler(world: World, port: int):
     return Handler
 
 
-def serve(world: World, port: int) -> ThreadingHTTPServer:
-    httpd = ThreadingHTTPServer((LOOPBACK, port), make_handler(world, port))
+def serve(world: World, port: int, host: str = None) -> ThreadingHTTPServer:
+    bind_host = host if host is not None else ('0.0.0.0' if _allow_external() else LOOPBACK)
+    httpd = ThreadingHTTPServer((bind_host, port), make_handler(world, port))
     httpd.daemon_threads = True
     httpd.stopping = False
     return httpd
@@ -302,7 +320,9 @@ def main(argv=None) -> int:
         p.add_argument('--state', required=True, type=Path)
         p.add_argument('--world', type=Path, default=DEFAULT_DEFINITION)
         if name == 'serve':
-            p.add_argument('--port', type=int, default=4300)
+            default_port = int(os.environ.get('PORT') or os.environ.get('WORLD_PORT') or 4300)
+            p.add_argument('--port', type=int, default=default_port)
+            p.add_argument('--host', default=None)
         if name == 'register':
             p.add_argument('--type', required=True, choices=['agent', 'human'])
             p.add_argument('--name', required=True)
@@ -320,8 +340,9 @@ def main(argv=None) -> int:
     world = World(args.state, args.world)
     try:
         if args.cmd == 'serve':
-            httpd = serve(world, args.port)
-            sys.stderr.write(f'ARKAIOS WORLD on http://{LOOPBACK}:{args.port} (seq {world.state.seq})\n')
+            bind_host = args.host if args.host is not None else ('0.0.0.0' if _allow_external() else LOOPBACK)
+            httpd = serve(world, args.port, bind_host)
+            sys.stderr.write(f'ARKAIOS WORLD on http://{bind_host}:{args.port} (seq {world.state.seq})\n')
             try:
                 httpd.serve_forever()
             except KeyboardInterrupt:

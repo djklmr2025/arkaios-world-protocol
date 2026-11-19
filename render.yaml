@@ -2,24 +2,16 @@ services:
   - type: web
     name: arkaios-world
     runtime: python
-    pythonVersion: 3.11
     buildCommand: pip install -r world/requirements.txt
-    startCommand: python world/server.py
+    startCommand: python world/server.py serve --state .local-world --port $PORT
     envVars:
-      - key: WORLD_PORT
-        value: 8080
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: ENVIRONMENT
         value: production
       - key: ALLOW_EXTERNAL
         value: "true"
-    routes:
-      - path: /
-        destination: http://localhost:8080
-    disk:
-      name: arkaios-data
-      mountPath: /app/.local-world
-      sizeGB: 5
-
-env:
-  WORLD_PORT: 8080
-  PYTHONUNBUFFERED: 1
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: GOOGLE_CLIENT_ID
+        value: 502663599735-e4p66giu79jpjiofi570loibdimuiqtm.apps.googleusercontent.com
