@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARKAIOS World — Creador de Personaje</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at top, #1b2a4a 0%, #0d1526 65%, #070b14 100%);
+    color: #f1f5f9;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .card {
+    width: 100%; max-width: 520px;
+    background: rgba(15, 23, 42, 0.92);
+    border: 2px solid rgba(96, 165, 250, 0.45);
+    border-radius: 18px;
+    padding: 24px 22px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 28px rgba(167, 139, 250, 0.16);
+    backdrop-filter: blur(8px);
+  }
+  .header { text-align: center; margin-bottom: 18px; }
+  .header h1 {
+    font-size: 22px; color: #ffd970; letter-spacing: 0.6px;
+    text-shadow: 0 2px 10px rgba(255, 217, 112, 0.3);
+  }
+  .header p { font-size: 12px; color: #94a3b8; margin-top: 6px; }
+
+  /* Preview Stage */
+  .preview-box {
+    background: radial-gradient(circle at center, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98));
+    border: 2px solid var(--accent, #60a5fa);
+    border-radius: 14px;
+    padding: 18px 14px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    margin-bottom: 18px;
+    box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.45), 0 0 18px var(--glow, rgba(96, 165, 250, 0.25));
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .avatar-wrap {
+    width: 112px; height: 112px;
+    display: flex; align-items: center; justify-content: center;
+    animation: floatAvatar 2.8s ease-in-out infinite;
+  }
+  @keyframes floatAvatar {
+    0%, 100% { transform: translateY(0px); }
+    50%      { transform: translateY(-5px); }
+  }
+  .nameplate {
+    background: rgba(10, 16, 30, 0.92);
+    border: 2px solid var(--accent, #60a5fa);
+    color: #fff;
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 13px; font-weight: bold; letter-spacing: 0.4px;
+    min-width: 140px; text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    transition: border-color 0.25s ease;
+  }
+  .preview-sub { font-size: 11px; color: #94a3b8; }
+
+  /* Form controls */
+  .section { margin-bottom: 16px; }
+  .section-label {
+    display: block; font-size: 12px; font-weight: bold;
+    color: #ffd970; margin-bottom: 8px;
+  }
+  .gender-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  }
+  .gender-opt { position: relative; }
+  .gender-opt input {
+    position: absolute; opacity: 0; pointer-events: none;
+  }
+  .gender-opt label {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 8px; border-radius: 10px;
+    background: rgba(30, 41, 59, 0.78);
+    border: 2px solid rgba(148, 163, 184, 0.25);
+    cursor: pointer; font-size: 12px; color: #cbd5e1;
+    transition: all 0.18s ease;
+  }
+  .gender-opt label .ico { font-size: 20px; }
+  .gender-opt input:checked + label {
+    background: rgba(30, 58, 108, 0.55);
+    border-color: var(--accent, #60a5fa);
+    color: #fff;
+    box-shadow: 0 0 12px var(--glow, rgba(96, 165, 250, 0.35));
+  }
+  .gender-opt label:hover { border-color: #ffd970; }
+
+  .input-wrap { position: relative; }
+  input[type="text"] {
+    width: 100%; padding: 11px 14px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 2px solid rgba(96, 165, 250, 0.4);
+    border-radius: 10px; color: #f8fafc;
+    font-family: inherit; font-size: 14px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input[type="text"]:focus {
+    border-color: #ffd970;
+    box-shadow: 0 0 0 3px rgba(255, 217, 112, 0.18);
+  }
+  .input-meta {
+    display: flex; justify-content: space-between; margin-top: 6px;
+    font-size: 11px; color: #94a3b8;
+  }
+  .error-msg {
+    display: none; margin-top: 8px; padding: 8px 10px;
+    border-radius: 8px; background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fca5a5; font-size: 11.5px;
+  }
+  .error-msg.show { display: block; }
+
+  /* Buttons */
+  .actions {
+    display: grid; grid-template-columns: auto 1fr 1.2fr; gap: 8px;
+    margin-top: 18px;
+  }
+  .btn {
+    padding: 11px 12px; border-radius: 10px; font-family: inherit;
+    font-size: 12.5px; font-weight: bold; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.1s, filter 0.15s, border-color 0.15s;
+    text-align: center; text-decoration: none;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-back {
+    background: rgba(30, 41, 59, 0.9); color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.35);
+  }
+  .btn-back:hover { border-color: #ffd970; color: #fff; }
+  .btn-rand {
+    background: rgba(167, 139, 250, 0.2); color: #ddd6fe;
+    border-color: rgba(167, 139, 250, 0.6);
+  }
+  .btn-rand:hover { background: rgba(167, 139, 250, 0.32); border-color: #c4b5fd; }
+  .btn-enter {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff; border-color: #ffd970;
+    box-shadow: 0 6px 18px rgba(96, 165, 250, 0.35);
+  }
+  .btn-enter:hover { filter: brightness(1.1); }
+
+  @media (max-width: 480px) {
+    .card { padding: 18px 14px; }
+    .actions { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <main class="card" id="card">
+    <div class="header">
+      <h1>✨ Creador de Personaje</h1>
+      <p>Personaliza tu ciudadano para explorar ARKAIOS World</p>
+    </div>
+
+    <section class="preview-box" id="previewBox" aria-live="polite">
+      <div class="avatar-wrap" id="avatarSvg"></div>
+      <div class="nameplate" id="previewName">Ciudadano</div>
+      <div class="preview-sub" id="previewMeta">👨 Masculino · Listo para entrar</div>
+    </section>
+
+    <form id="creatorForm" novalidate>
+      <div class="section">
+        <span class="section-label">1. Selecciona tu género</span>
+        <div class="gender-grid">
+          <div class="gender-opt">
+            <input type="radio" name="gender" id="g-m" value="M" checked>
+            <label for="g-m"><span class="ico">👨</span><span>Masculino</span></label>
+          </div>
+          <div class="gender-opt">
+            <input type="radio" name="gender" id="g-f" value="F">
+            <label for="g-f"><span class="ico">👩</span><span>Femenino</span></label>
+          </div>
+          <div class="gender-opt">
+            <input type="radio" name="gender" id="g-nb" value="NB">
+            <label for="g-nb"><span class="ico">🧑</span><span>Neutral</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <label class="section-label" for="nameInput">2. Nombre de ciudadano</label>
+        <div class="input-wrap">
+          <input
+            type="text"
+            id="nameInput"
+            name="name"
+            minlength="3"
+            maxlength="20"
+            autocomplete="off"
+            placeholder="Tu nombre de ciudadano"
+          >
+        </div>
+        <div class="input-meta">
+          <span>3–20 caracteres (letras, números y espacios)</span>
+          <span id="charCount">0 / 20</span>
+        </div>
+        <div class="error-msg" id="errorMsg" role="alert"></div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-back" id="btnBack">← Atrás</button>
+        <button type="button" class="btn btn-rand" id="btnRandom">🎲 Generar Aleatorio</button>
+        <button type="submit" class="btn btn-enter" id="btnEnter">Entrar al Mundo →</button>
+      </div>
+    </form>
+  </main>
+
+<script>
+(() => {
+  const THEMES = {
+    M:  { accent: '#60a5fa', glow: 'rgba(96, 165, 250, 0.35)',  label: '👨 Masculino', hair: '#1e3a8a', outfit: '#2563eb', trim: '#ffd970', eye: '#38bdf8' },
+    F:  { accent: '#f472b6', glow: 'rgba(244, 114, 182, 0.35)', label: '👩 Femenino',  hair: '#db2777', outfit: '#ec4899', trim: '#ffd970', eye: '#f472b6' },
+    NB: { accent: '#a78bfa', glow: 'rgba(167, 139, 250, 0.38)', label: '🧑 Neutral',   hair: '#6d28d9', outfit: '#8b5cf6', trim: '#ffd970', eye: '#c084fc' }
+  };
+
+  const FIRST_NAMES = {
+    M:  ['Kai', 'Leo', 'Vale', 'Nova', 'Sage', 'Orion', 'Axel', 'Dante'],
+    F:  ['Aria', 'Luna', 'Zara', 'Nova', 'Vale', 'Lyra', 'Kira', 'Mina'],
+    NB: ['Sage', 'Nova', 'Vale', 'Kai', 'Sky', 'Echo', 'Aether', 'Nyx']
+  };
+  const LAST_NAMES = ['Storm', 'Wind', 'Fire', 'Stone', 'Light', 'Shadow', 'Sky'];
+
+  const VALID_NAME_RE = /^[A-Za-z0-9ÁÉÍÓÚáéíóúÑñÜü ]+$/;
+
+  const previewBox  = document.getElementById('previewBox');
+  const avatarSvg   = document.getElementById('avatarSvg');
+  const previewName = document.getElementById('previewName');
+  const previewMeta = document.getElementById('previewMeta');
+  const nameInput   = document.getElementById('nameInput');
+  const charCount   = document.getElementById('charCount');
+  const errorMsg    = document.getElementById('errorMsg');
+  const card        = document.getElementById('card');
+
+  function getGender() {
+    const checked = document.querySelector('input[name="gender"]:checked');
+    return checked ? checked.value : 'M';
+  }
+
+  function renderAvatarSVG(g) {
+    const t = THEMES[g] || THEMES.M;
+    const longHair = g === 'F'
+      ? `<rect x="20" y="22" width="56" height="44" rx="14" fill="${t.hair}" opacity="0.95"/>`
+      : (g === 'NB'
+        ? `<rect x="22" y="20" width="52" height="32" rx="12" fill="${t.hair}" opacity="0.95"/>`
+        : '');
+    const crown = g === 'F'
+      ? `<polygon points="36,18 42,10 48,16 54,10 60,18" fill="${t.trim}"/>`
+      : (g === 'NB'
+        ? `<circle cx="48" cy="14" r="4" fill="${t.trim}"/>`
+        : `<rect x="34" y="14" width="28" height="4" rx="2" fill="${t.trim}"/>`);
+
+    return `
+      <svg width="96" height="96" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avatar ${t.label}">
+        <ellipse cx="48" cy="88" rx="24" ry="6" fill="rgba(0,0,0,0.45)"/>
+        ${longHair}
+        <!-- Body / Tunic -->
+        <rect x="28" y="54" width="40" height="26" rx="10" fill="${t.outfit}"/>
+        <rect x="44" y="54" width="8" height="26" fill="${t.trim}"/>
+        <!-- Legs -->
+        <rect x="34" y="76" width="10" height="10" rx="3" fill="#1e293b"/>
+        <rect x="52" y="76" width="10" height="10" rx="3" fill="#1e293b"/>
+        <!-- Head -->
+        <rect x="28" y="20" width="40" height="34" rx="14" fill="#fde2d2"/>
+        <!-- Hair top -->
+        <path d="M26 32 C26 16, 70 16, 70 32 L66 28 L56 31 L48 26 L40 31 L30 28 Z" fill="${t.hair}"/>
+        ${crown}
+        <!-- Eyes -->
+        <rect x="37" y="34" width="5" height="7" rx="2" fill="${t.eye}"/>
+        <rect x="54" y="34" width="5" height="7" rx="2" fill="${t.eye}"/>
+        <rect x="38" y="35" width="2" height="2" fill="#fff"/>
+        <rect x="55" y="35" width="2" height="2" fill="#fff"/>
+        <!-- Smile -->
+        <path d="M43 45 Q48 49 53 45" stroke="#9f5f52" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>`;
+  }
+
+  function updatePreview() {
+    const g = getGender();
+    const t = THEMES[g];
+    const clean = nameInput.value.trim();
+
+    card.style.setProperty('--accent', t.accent);
+    card.style.setProperty('--glow', t.glow);
+    previewBox.style.setProperty('--accent', t.accent);
+    previewBox.style.setProperty('--glow', t.glow);
+
+    avatarSvg.innerHTML = renderAvatarSVG(g);
+    previewName.textContent = clean || 'Tu Nombre';
+    previewMeta.textContent = `${t.label} · Ciudadano de ARKAIOS World`;
+    charCount.textContent = `${nameInput.value.length} / 20`;
+  }
+
+  function showError(msg) {
+    if (!msg) {
+      errorMsg.classList.remove('show');
+      errorMsg.textContent = '';
+    } else {
+      errorMsg.textContent = '⚠️ ' + msg;
+      errorMsg.classList.add('show');
+    }
+  }
+
+  function validateName(raw) {
+    const name = raw.trim();
+    if (name.length < 3) return 'El nombre debe tener al menos 3 caracteres.';
+    if (name.length > 20) return 'El nombre no puede superar los 20 caracteres.';
+    if (!VALID_NAME_RE.test(name)) return 'Usa solo letras, números y espacios (sin símbolos especiales).';
+    return '';
+  }
+
+  function generateUUID() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  function pickRandomName() {
+    const g = getGender();
+    const firsts = FIRST_NAMES[g] || FIRST_NAMES.M;
+    const f = firsts[Math.floor(Math.random() * firsts.length)];
+    const l = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+    const combined = `${f} ${l}`.slice(0, 20);
+    nameInput.value = combined;
+    showError('');
+    updatePreview();
+  }
+
+  // Restore previous localStorage values if returning
+  const savedGender = localStorage.getItem('arkaios_player_gender');
+  if (savedGender && THEMES[savedGender]) {
+    const radio = document.querySelector(`input[name="gender"][value="${savedGender}"]`);
+    if (radio) radio.checked = true;
+  }
+  const savedName = localStorage.getItem('arkaios_player_name');
+  if (savedName) nameInput.value = savedName.slice(0, 20);
+
+  document.querySelectorAll('input[name="gender"]').forEach(r => {
+    r.addEventListener('change', updatePreview);
+  });
+  nameInput.addEventListener('input', () => {
+    showError('');
+    updatePreview();
+  });
+
+  document.getElementById('btnRandom').addEventListener('click', pickRandomName);
+  document.getElementById('btnBack').addEventListener('click', () => {
+    if (document.referrer && document.referrer.startsWith(window.location.origin)) {
+      window.history.back();
+    } else {
+      window.location.href = '/login';
+    }
+  });
+
+  document.getElementById('creatorForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const err = validateName(nameInput.value);
+    if (err) {
+      showError(err);
+      nameInput.focus();
+      return;
+    }
+    const gender = getGender();
+    const name = nameInput.value.trim();
+    const session = {
+      gender,
+      name,
+      created_at: new Date().toISOString(),
+      session_id: generateUUID()
+    };
+
+    localStorage.setItem('arkaios_player_gender', gender);
+    localStorage.setItem('arkaios_player_name', name);
+    localStorage.setItem('arkaios_player_session', JSON.stringify(session));
+
+    window.location.href = '/map';
+  });
+
+  updatePreview();
+})();
+</script>
+</body>
+</html>
