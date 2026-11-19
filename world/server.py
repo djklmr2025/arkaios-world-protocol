@@ -33,6 +33,7 @@ CLIENT_HTML = HERE / 'client' / 'index.html'
 PAGES = {  # extra static files the client serves, with their content type
     '/simulacion': (HERE / 'client' / 'simulacion.html', 'text/html; charset=utf-8'),
     '/sim/apartment-map.js': (HERE / 'client' / 'apartment-map.js', 'application/javascript; charset=utf-8'),
+    '/ecosystem': (HERE / 'client' / 'ecosystem-viewer.html', 'text/html; charset=utf-8'),
 }
 ASSETS_DIR = HERE / 'client' / 'assets'
 ASSET_RE = re.compile(r'^/assets/([a-z_]{1,24})\.png$')
@@ -87,6 +88,9 @@ def make_handler(world: World, port: int):
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
             self.send_header('Cache-Control', 'no-store')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', '*')
             self.end_headers()
             self.wfile.write(data)
 

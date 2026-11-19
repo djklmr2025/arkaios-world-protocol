@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARKAIOS World — Ecosistema</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 24px;
+      background: linear-gradient(45deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #94a3b8;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .status-bar {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .status-online {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    .citizens-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .citizen-card {
+      background: rgba(51, 65, 85, 0.6);
+      border: 1px solid #475569;
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .citizen-card:hover {
+      border-color: #60a5fa;
+      background: rgba(96, 165, 250, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .avatar {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .citizen-name {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 5px;
+      color: #f1f5f9;
+    }
+
+    .citizen-type {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .citizen-room {
+      font-size: 12px;
+      background: rgba(96, 165, 250, 0.2);
+      color: #93c5fd;
+      padding: 6px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    .citizen-status {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      display: inline-block;
+      font-weight: bold;
+    }
+
+    .status-active {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+
+    .status-offline {
+      background: rgba(107, 114, 128, 0.2);
+      color: #9ca3af;
+    }
+
+    .world-info {
+      background: rgba(51, 65, 85, 0.6);
+      border: 1px solid #475569;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    .world-info h3 {
+      color: #60a5fa;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .world-info p {
+      color: #cbd5e1;
+      margin-bottom: 6px;
+      line-height: 1.5;
+    }
+
+    .refresh-btn {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+    }
+
+    .refresh-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.98);
+    }
+
+    .loading {
+      text-align: center;
+      color: #94a3b8;
+      padding: 20px;
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13px;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 0;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      .citizens-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌍 ARKAIOS World</h1>
+    <p class="subtitle">Ecosistema de Agentes</p>
+
+    <div id="statusBar" class="status-bar">
+      <span class="status-online">● Conectando...</span>
+    </div>
+
+    <div id="errorContainer"></div>
+
+    <div id="worldInfo" class="world-info" style="display: none;">
+      <h3>Estado del Mundo</h3>
+      <p>Ciudadanos: <span id="citizenCount">-</span></p>
+      <p>Salas activas: <span id="roomCount">-</span></p>
+      <p>Última actualización: <span id="lastUpdate">-</span></p>
+    </div>
+
+    <div id="citizensContainer" class="citizens-grid">
+      <div class="loading">Cargando ciudadanos...</div>
+    </div>
+
+    <button class="refresh-btn" onclick="loadWorld()">🔄 Actualizar</button>
+  </div>
+
+  <script>
+    const WORLD_URL = 'http://127.0.0.1:4300';
+
+    async function loadWorld() {
+      try {
+        const response = await fetch(`${WORLD_URL}/api/world`);
+
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.ok) {
+          throw new Error(data.message || 'Error desconocido');
+        }
+
+        // Extract citizens from entities (try multiple paths)
+        const entities = data.entities || data.snapshot?.entities || {};
+        const citizens = Object.entries(entities).map(([id, entity]) => ({
+          id: id,
+          display_name: entity.display_name || 'Unknown',
+          type: entity.type || 'unknown',
+          status: entity.status || 'offline',
+          current_room: entity.current_room,
+          capabilities: entity.capabilities || []
+        }));
+
+        renderWorld({ citizens });
+        updateStatus('online');
+      } catch (err) {
+        console.error('Error:', err);
+        showError(`No se puede conectar al World: ${err.message}`);
+        updateStatus('offline');
+      }
+    }
+
+    function renderWorld(world) {
+      const container = document.getElementById('citizensContainer');
+      const infoDiv = document.getElementById('worldInfo');
+
+      if (!world.citizens || world.citizens.length === 0) {
+        container.innerHTML = '<p class="loading">No hay ciudadanos registrados</p>';
+        return;
+      }
+
+      container.innerHTML = world.citizens.map(citizen => {
+        const avatar = getAvatar(citizen.display_name);
+        const isOnline = citizen.status === 'active';
+        const room = citizen.current_room || 'Sin sala';
+        const roomName = formatRoom(room);
+
+        return `
+          <div class="citizen-card">
+            <div class="avatar">${avatar}</div>
+            <div class="citizen-name">${citizen.display_name}</div>
+            <div class="citizen-type">${citizen.type === 'human' ? '👤 Humano' : '🤖 Agente'}</div>
+            <div class="citizen-room">${roomName}</div>
+            <div class="citizen-status ${isOnline ? 'status-active' : 'status-offline'}">
+              ${isOnline ? '● En línea' : '● Offline'}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Update world info
+      document.getElementById('citizenCount').textContent = world.citizens.length;
+      document.getElementById('roomCount').textContent = new Set(
+        world.citizens.map(c => c.current_room).filter(r => r)
+      ).size;
+      document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('es-MX');
+      infoDiv.style.display = 'block';
+    }
+
+    function getAvatar(name) {
+      const avatars = {
+        'Arkaios': '👤',
+        'Claude': '🤖',
+        'ELEMIA': '👸',
+        'NINA': '🤖'
+      };
+      return avatars[name] || '👥';
+    }
+
+    function formatRoom(room) {
+      const rooms = {
+        'room:plaza:lobby': 'Plaza Central 🏛️',
+        'room:taller:estudio': 'Estudio de Agentes 🎨',
+        'room:taller:biblioteca': 'Biblioteca 📚',
+        'room:taller:consejo': 'Sala del Consejo ⚖️'
+      };
+      return rooms[room] || room;
+    }
+
+    function updateStatus(status) {
+      const bar = document.getElementById('statusBar');
+      if (status === 'online') {
+        bar.innerHTML = '<span class="status-online">● ARKAIOS World en línea</span>';
+      } else {
+        bar.innerHTML = '<span style="color: #ef4444;">● Mundo desconectado</span>';
+      }
+    }
+
+    function showError(message) {
+      const errorContainer = document.getElementById('errorContainer');
+      errorContainer.innerHTML = `<div class="error">${message}</div>`;
+    }
+
+    // Load on start
+    loadWorld();
+
+    // Auto-refresh every 5 seconds
+    setInterval(loadWorld, 5000);
+  </script>
+</body>
+</html>
