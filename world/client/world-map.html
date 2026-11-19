@@ -708,18 +708,88 @@
     ctx.fillText(text, x, y);
   }
 
+  // ===== 6. PLAYER CONTROL =====
+  let playerToken = localStorage.getItem('arkaios_token');
+  let playerId = localStorage.getItem('arkaios_citizen_id');
+  let playerLastMove = 0;
+  const PLAYER_MOVE_COOLDOWN = 0.4; // seconds between moves
+
+  async function playerMove(direction) {
+    const now = performance.now() / 1000;
+    if (now - playerLastMove < PLAYER_MOVE_COOLDOWN) return;
+    playerLastMove = now;
+
+    if (!playerToken || !playerId) {
+      console.warn('No player token. Login at /login first');
+      return;
+    }
+
+    const player = actors.get(playerId);
+    if (!player) return;
+
+    // Map direction to room offsets
+    const rooms = {
+      'w': { from: player.room, to: 'north' },   // up
+      's': { from: player.room, to: 'south' },   // down
+      'a': { from: player.room, to: 'west' },    // left
+      'd': { from: player.room, to: 'east' },    // right
+    };
+
+    const move = rooms[direction];
+    if (!move) return;
+
+    try {
+      const r = await fetch('/api/actions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${playerToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          type: 'move',
+          direction: direction,
+          from_room: move.from,
+          to_room: move.to
+        })
+      });
+      const data = await r.json();
+      if (data.ok) {
+        cam.followId = playerId; // Follow player
+      }
+    } catch (e) {
+      console.error('Move failed:', e);
+    }
+  }
+
   // ===== 6. MAIN ANIMATION LOOP =====
   let lastT = performance.now();
   function tick(now) {
     const dt = Math.min(0.05, (now - lastT) / 1000);
     lastT = now;
 
-    // Keyboard camera pan
+    // Keyboard input: WASD = player move, Shift+WASD = camera pan
     const panSpd = 380 / cam.zoom;
-    if (keys['ArrowLeft'] || keys['KeyA'])  { cam.x -= panSpd * dt; cam.followId = null; }
-    if (keys['ArrowRight'] || keys['KeyD']) { cam.x += panSpd * dt; cam.followId = null; }
-    if (keys['ArrowUp'] || keys['KeyW'])    { cam.y -= panSpd * dt; cam.followId = null; }
-    if (keys['ArrowDown'] || keys['KeyS'])  { cam.y += panSpd * dt; cam.followId = null; }
+    if (playerToken && playerToken !== '') {
+      // Player mode: WASD moves player, Shift+WASD pans camera
+      const shift = keys['ShiftLeft'] || keys['ShiftRight'];
+      if (shift) {
+        if (keys['ArrowLeft'] || keys['KeyA'])  { cam.x -= panSpd * dt; cam.followId = null; }
+        if (keys['ArrowRight'] || keys['KeyD']) { cam.x += panSpd * dt; cam.followId = null; }
+        if (keys['ArrowUp'] || keys['KeyW'])    { cam.y -= panSpd * dt; cam.followId = null; }
+        if (keys['ArrowDown'] || keys['KeyS'])  { cam.y += panSpd * dt; cam.followId = null; }
+      } else {
+        if (keys['KeyW']) { playerMove('w'); keys['KeyW'] = false; }
+        if (keys['KeyS']) { playerMove('s'); keys['KeyS'] = false; }
+        if (keys['KeyA']) { playerMove('a'); keys['KeyA'] = false; }
+        if (keys['KeyD']) { playerMove('d'); keys['KeyD'] = false; }
+      }
+    } else {
+      // No player: WASD pans camera normally
+      if (keys['ArrowLeft'] || keys['KeyA'])  { cam.x -= panSpd * dt; cam.followId = null; }
+      if (keys['ArrowRight'] || keys['KeyD']) { cam.x += panSpd * dt; cam.followId = null; }
+      if (keys['ArrowUp'] || keys['KeyW'])    { cam.y -= panSpd * dt; cam.followId = null; }
+      if (keys['ArrowDown'] || keys['KeyS'])  { cam.y += panSpd * dt; cam.followId = null; }
+    }
 
     // Update actors (smooth movement + gentle local wandering inside their district)
     for (const a of actors.values()) {
