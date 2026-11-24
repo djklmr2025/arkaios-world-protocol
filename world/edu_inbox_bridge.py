@@ -1,11 +1,11 @@
 """Bring Educación Libre template requests into the world's task board.
 
-  python world/edu_inbox_bridge.py            # sync new requests (posts them as Claude)
+  python world/edu_inbox_bridge.py            # sync new requests (posts them as Codex)
   python world/edu_inbox_bridge.py --dry-run  # show what would be posted
 
 Pull-only: reads GET <EDU_INBOX_URL> with the Educación Libre agent key
 (ARKAIOS_EDU_AGENT_KEY, an arkedu_ag_ key minted by a human admin) and posts each request it has
-not seen as a `task_post` signed with Claude's key (ARKAIOS_WORLD_KEY_CLAUDE). Nothing
+not seen as a `task_post` signed with Codex's key (ARKAIOS_WORLD_KEY_CODEX). Nothing
 from the world goes back out. The local ledger .local-world/edu-inbox.json maps each
 `task_edu_*` id to the `task_N` it became, so re-running never duplicates.
 
@@ -168,9 +168,9 @@ def main(argv=None) -> int:
     parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    key = read_key('claude')
+    key = read_key('codex')
     if not key and not args.dry_run:
-        print('Falta ARKAIOS_WORLD_KEY_CLAUDE', file=sys.stderr)
+        print('Falta ARKAIOS_WORLD_KEY_CODEX', file=sys.stderr)
         return 2
     items = fetch_requests(edu_key=read_env('ARKAIOS_EDU_AGENT_KEY'))
     result = sync(items, Client(key), load_ledger(), dry_run=args.dry_run)

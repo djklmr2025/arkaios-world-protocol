@@ -1,7 +1,7 @@
 """ARKAIOS WORLD reference server v0.1 (loopback only, stdlib only).
 
   python world/server.py serve    --state DIR [--port 4300]
-  python world/server.py register --state DIR --type agent --name Claude --alias claude \
+  python world/server.py register --state DIR --type agent --name Codex --alias codex \
                                   --owner "Operador ARKAIOS" --trust core [--capability coding]
   python world/server.py revoke   --state DIR --id ark:local-alpha:3 --reason "..."
   python world/server.py list     --state DIR
@@ -28,6 +28,9 @@ from mail import public_view  # noqa: E402
 from state import Rejected  # noqa: E402
 from store import World  # noqa: E402
 from agents_autonomy import AgentsController  # noqa: E402
+from chat_system import init_db as init_chat_db  # noqa: E402
+from feedback_system import init_db as init_feedback_db  # noqa: E402
+from visitor_sessions import VisitorSessions  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_DEFINITION = HERE / 'world.json'
@@ -78,13 +81,16 @@ class RateLimiter:
 
 def _allow_external() -> bool:
     return (os.environ.get('ALLOW_EXTERNAL', '').lower() in ('1', 'true', 'yes')
-            or os.environ.get('ENVIRONMENT', '').lower() == 'production')
+            or os.environ.get('ENVIRONMENT', '').lower() == 'production'
+            or os.environ.get('ARKAIOS_ALLOW_TAILSCALE', '0') == '1')
 
 
 def make_handler(world: World, port: int, agents_controller: AgentsController = None):
-    allowed_hosts = {f'{LOOPBACK}:{port}', f'localhost:{port}'}
+    allowed_hosts = {f'{LOOPBACK}:{port}', f'localhost:{port}', f'100.89.203.88:{port}', f'100.90.81.75:{port}'}
     allow_external = _allow_external()
     limiter = RateLimiter(RATE_WINDOW_S, RATE_MAX_ACTIONS)
+    feedback_limiter = RateLimiter(60.0, 6)
+    visitor_sessions = VisitorSessions()
 
     class Handler(BaseHTTPRequestHandler):
         server_version = 'ArkaiosWorld/0.1'
@@ -111,10 +117,14 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
         def _host_ok(self) -> bool:
             if allow_external:
                 return True
-            # Blocks DNS-rebinding: browsers send the attacker's hostname here.
-            if self.headers.get('Host') in allowed_hosts:
+            # Blocks DNS-rebinding while permitting loopback and Tailscale CGNAT IP ranges (100.x.x.x)
+            host_header = self.headers.get('Host', '')
+            host_only = host_header.split(':')[0].strip().lower()
+            if (host_header in allowed_hosts or
+                host_only in ('127.0.0.1', 'localhost', '100.89.203.88', '100.90.81.75') or
+                host_only.startswith('100.')):
                 return True
-            self._error(HTTPStatus.FORBIDDEN, 'bad_host', 'loopback host required')
+            self._error(HTTPStatus.FORBIDDEN, 'bad_host', 'loopback or tailscale host required')
             return False
 
         def _auth(self):
@@ -124,6 +134,13 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
             if entity is None:
                 self._error(HTTPStatus.UNAUTHORIZED, 'unauthorized', 'valid Bearer arkw_ key required')
             return entity
+
+        def _visitor_auth(self):
+            session = visitor_sessions.verify(self.headers.get('X-Arkaios-Visitor-Session', ''))
+            if session is None:
+                self._error(HTTPStatus.UNAUTHORIZED, 'visitor_login_required',
+                            'sign in with Google before publishing public feedback')
+            return session
 
         def do_GET(self):
             if not self._host_ok():
@@ -171,36 +188,49 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
                 return
             if url.path == '/api/events':
                 return self._stream(parse_qs(url.query))
+            if url.path == '/api/chat/history':
+                return self._get_chat_history()
+            if url.path == '/api/feedback':
+                return self._get_public_feedback()
+            if url.path == '/api/feedback/summary':
+                return self._get_feedback_summary()
             self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such route')
 
         def _handle_google_auth(self):
             try:
                 content_len = int(self.headers.get('Content-Length', 0))
+                if not 0 < content_len <= MAX_BODY:
+                    return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, 'bad_body', 'credential required')
                 body = self.rfile.read(content_len).decode('utf-8')
                 data = json.loads(body)
-
-                # For demo: extract email from JWT payload (should validate signature in production)
                 id_token = data.get('id_token', '')
-                email = data.get('email', '').lower()
-                name = data.get('name', email.split('@')[0])
-
-                if not email:
-                    return self._error(HTTPStatus.BAD_REQUEST, 'invalid_email', 'email required')
-
-                # Create or get citizen for this user
-                citizen_alias = email.replace('@', '_').replace('.', '_')
-                citizen_id = f'citizen:{citizen_alias}:google'
-
-                # For now, generate a simple token
-                token = f'arkw_google_{hashlib.sha256(email.encode()).hexdigest()[:32]}'
-
-                sys.stderr.write(f'[INFO] Google auth: {email} -> {citizen_id}\n')
-
+                if (not isinstance(id_token, str) or len(id_token) > 8192 or
+                        id_token.count('.') != 2):
+                    return self._error(HTTPStatus.BAD_REQUEST, 'invalid_credential', 'Google credential required')
+                client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
+                if not client_id:
+                    return self._error(HTTPStatus.SERVICE_UNAVAILABLE, 'login_unconfigured', 'Google login is not configured')
+                try:
+                    from google.auth.transport import requests as google_requests
+                    from google.oauth2 import id_token as google_id_token
+                    class TimedGoogleRequest(google_requests.Request):
+                        def __call__(self, *args, **kwargs):
+                            kwargs['timeout'] = min(float(kwargs.get('timeout', 5)), 5)
+                            return super().__call__(*args, **kwargs)
+                    claims = google_id_token.verify_oauth2_token(id_token, TimedGoogleRequest(), client_id)
+                except ImportError:
+                    return self._error(HTTPStatus.SERVICE_UNAVAILABLE, 'login_unavailable', 'Google verification dependency unavailable')
+                except ValueError:
+                    return self._error(HTTPStatus.UNAUTHORIZED, 'invalid_credential', 'Google credential could not be verified')
+                if claims.get('iss') not in ('accounts.google.com', 'https://accounts.google.com') or not claims.get('sub'):
+                    return self._error(HTTPStatus.UNAUTHORIZED, 'invalid_credential', 'unexpected Google identity')
+                name = str(claims.get('name') or claims.get('given_name') or 'Visitante').strip()[:40] or 'Visitante'
+                session = visitor_sessions.issue(claims['sub'], name)
                 return self._send_json(HTTPStatus.OK, {
                     'ok': True,
-                    'citizen_id': citizen_id,
-                    'token': token,
-                    'message': f'Welcome {name}!'
+                    'visitor_session': session,
+                    'display_name': name,
+                    'message': f'Bienvenido, {name}'
                 })
             except Exception as e:
                 sys.stderr.write(f'[ERROR] Google auth failed: {str(e)}\n')
@@ -212,6 +242,10 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
             path = urlparse(self.path).path
             if path == '/api/auth/google':
                 return self._handle_google_auth()
+            if path == '/api/chat/send':
+                return self._handle_chat_message()
+            if path == '/api/feedback':
+                return self._handle_public_feedback()
             if path != '/api/actions':
                 return self._error(HTTPStatus.NOT_FOUND, 'not_found', 'no such route')
             entity = self._auth()
@@ -235,6 +269,69 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
             except Rejected as exc:
                 return self._error(HTTPStatus.CONFLICT, exc.code, exc.message)
             self._send_json(HTTPStatus.OK, {'ok': True, 'events': events})
+
+        def _handle_chat_message(self):
+            entity = self._auth()
+            if entity is None:
+                return
+            length = int(self.headers.get('Content-Length') or 0)
+            if not 0 < length <= MAX_BODY:
+                return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, 'bad_body', 'body too large')
+            try:
+                data = json.loads(self.rfile.read(length))
+                msg = data.get('message', '').strip()
+                chat_type = data.get('type', 'chat')
+                if not msg:
+                    return self._error(HTTPStatus.BAD_REQUEST, 'empty_message', 'message required')
+                from chat_system import ChatMessage, save_message
+                chat_msg = ChatMessage(entity['id'], entity.get('display_name', 'Unknown'), msg, chat_type)
+                save_message(chat_msg)
+                self._send_json(HTTPStatus.OK, {'ok': True, 'msg_id': chat_msg.id})
+            except Exception as e:
+                return self._error(HTTPStatus.BAD_REQUEST, 'chat_error', str(e))
+
+        def _handle_public_feedback(self):
+            # Keep the public feedback surface local by default.  A deployment must
+            # consciously opt in instead of accidentally becoming a spam endpoint.
+            if allow_external and os.environ.get('ARKAIOS_PUBLIC_FEEDBACK', '0') != '1':
+                return self._error(HTTPStatus.FORBIDDEN, 'feedback_disabled',
+                                   'public feedback is not enabled for this deployment')
+            if not feedback_limiter.allow(self.client_address[0]):
+                return self._error(HTTPStatus.TOO_MANY_REQUESTS, 'rate_limited',
+                                   'try again in a minute')
+            length = int(self.headers.get('Content-Length') or 0)
+            if not 0 < length <= MAX_BODY:
+                return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, 'bad_body', 'body too large')
+            try:
+                visitor = self._visitor_auth()
+                if visitor is None:
+                    return
+                data = json.loads(self.rfile.read(length))
+                if not isinstance(data, dict):
+                    raise ValueError('invalid_payload')
+                from feedback_system import create_feedback
+                record = create_feedback(visitor['name'], data.get('category'), data.get('message'))
+                self._send_json(HTTPStatus.CREATED, {'ok': True, 'feedback': record})
+            except (ValueError, json.JSONDecodeError):
+                return self._error(HTTPStatus.BAD_REQUEST, 'invalid_feedback',
+                                   'a visible name, category, and short message are required')
+
+        def _get_public_feedback(self):
+            try:
+                from feedback_system import get_public_feedback
+                self._send_json(HTTPStatus.OK, {'ok': True, 'feedback': get_public_feedback()})
+            except Exception as exc:
+                return self._error(HTTPStatus.INTERNAL_SERVER_ERROR, 'feedback_error', str(exc))
+
+        def _get_feedback_summary(self):
+            entity = self._auth()
+            if entity is None:
+                return
+            if entity.get('type') != 'agent':
+                return self._error(HTTPStatus.FORBIDDEN, 'agent_only',
+                                   'only registered agents can request the feedback summary')
+            from feedback_system import feedback_summary
+            self._send_json(HTTPStatus.OK, {'ok': True, 'summary': feedback_summary()})
 
         def _serve_client(self, path=CLIENT_HTML, content_type='text/html; charset=utf-8'):
             data = path.read_bytes()
@@ -303,6 +400,14 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
                 pass
 
+        def _get_chat_history(self):
+            try:
+                from chat_system import get_recent_messages
+                messages = get_recent_messages(limit=50)
+                self._send_json(HTTPStatus.OK, {'ok': True, 'messages': messages})
+            except Exception as e:
+                return self._error(HTTPStatus.INTERNAL_SERVER_ERROR, 'chat_error', str(e))
+
     return Handler
 
 
@@ -329,9 +434,11 @@ def ensure_base_citizens(world: World) -> None:
 
     base_citizens = {
         'Arkaios': {'type': 'human', 'owner': 'Arkaios', 'trust': 'core'},
-        'Claude': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['coding']},
+        'Codex': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['coding', 'orchestration']},
         'ELEMIA': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['graphics']},
         'NINA': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'core', 'caps': ['monitoring']},
+        'Chai-Gati-Pet': {'type': 'agent', 'owner': 'Arkaios', 'trust': 'trusted',
+                          'caps': ['orchestration', 'governance', 'custody', 'memory']},
     }
 
     for name, cfg in base_citizens.items():
@@ -382,6 +489,8 @@ def main(argv=None) -> int:
     try:
         if args.cmd == 'serve':
             ensure_base_citizens(world)
+            init_chat_db()
+            init_feedback_db()
             bind_host = args.host if args.host is not None else ('0.0.0.0' if _allow_external() else LOOPBACK)
 
             # Create and start agents controller

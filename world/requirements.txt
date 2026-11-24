@@ -1,1 +1,2 @@
-# ARKAIOS World server uses Python 3.11+ standard library only.
+# Google Identity ID-token validation for public visitor sessions.
+google-auth>=2.0,<3

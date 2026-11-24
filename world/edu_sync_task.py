@@ -70,9 +70,9 @@ def ensure_world() -> bool:
 def sync_requests() -> None:
     from edu_inbox_bridge import fetch_requests, load_ledger, read_env, save_ledger, sync
     from presence_hook import Client, read_key
-    key, edu_key = read_key('claude'), read_env('ARKAIOS_EDU_AGENT_KEY')
+    key, edu_key = read_key('codex'), read_env('ARKAIOS_EDU_AGENT_KEY')
     if not key or not edu_key:
-        log('Faltan ARKAIOS_WORLD_KEY_CLAUDE o ARKAIOS_EDU_AGENT_KEY.')
+        log('Faltan ARKAIOS_WORLD_KEY_CODEX o ARKAIOS_EDU_AGENT_KEY.')
         return
     items = fetch_requests(edu_key=edu_key)
     result = sync(items, Client(key), load_ledger())

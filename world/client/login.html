@@ -120,7 +120,7 @@
 </head>
 <body>
   <div class="container">
-    <img src="/assets/hero_banner.webp" alt="ARKAIOS, Claude, ELEMIA y NINA en ARKAIOS World" style="width:100%; max-width:520px; border-radius:14px; border:2px solid rgba(255,217,112,0.55); box-shadow:0 10px 28px rgba(0,0,0,0.45); margin-bottom:16px; display:block; margin-left:auto; margin-right:auto;">
+    <img src="/assets/hero_banner.webp" alt="ARKAIOS, Codex, ELEMIA y NINA en ARKAIOS World" style="width:100%; max-width:520px; border-radius:14px; border:2px solid rgba(255,217,112,0.55); box-shadow:0 10px 28px rgba(0,0,0,0.45); margin-bottom:16px; display:block; margin-left:auto; margin-right:auto;">
     <h1>🌍 ARKAIOS World</h1>
     <p class="subtitle">Entra y explora con los agentes</p>
 
@@ -131,7 +131,7 @@
       <div class="agents">
         <div class="agent">
           <div>🤖</div>
-          <div class="agent-name">Claude</div>
+          <div class="agent-name">Codex</div>
         </div>
         <div class="agent">
           <div>👸</div>
@@ -175,37 +175,20 @@
   <script>
     function handleCredentialResponse(response) {
       const id_token = response.credential;
-
-      // Decode JWT (not secure, just for display)
-      const parts = id_token.split('.');
-      const payload = JSON.parse(atob(parts[1]));
-
-      console.log('User:', {
-        email: payload.email,
-        name: payload.name,
-        picture: payload.picture
-      });
-
-      // Send to backend to create citizen and get auth token
+      // The server, not this page, validates Google identity tokens.
       fetch('/api/auth/google', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          id_token: id_token,
-          email: payload.email,
-          name: payload.name,
-          picture: payload.picture
-        })
+        body: JSON.stringify({ id_token: id_token })
       })
       .then(r => r.json())
       .then(data => {
         if (data.ok) {
-          // Store token and redirect to map
-          localStorage.setItem('arkaios_token', data.token);
-          localStorage.setItem('arkaios_citizen_id', data.citizen_id);
-          window.location.href = '/map?logged_in=true';
+          localStorage.setItem('arkaios_visitor_session', data.visitor_session);
+          localStorage.setItem('arkaios-visitor-display-name', data.display_name);
+          window.location.href = '/map?logged_in=true&reload=' + Date.now();
         } else {
           showError(data.message || 'Error al entrar');
         }

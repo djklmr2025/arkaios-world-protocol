@@ -152,6 +152,9 @@ class World:
             return None
         with self.cond:
             entity_id = self.keys.get(hash_key(key))
+            if not entity_id:
+                self.keys = self._load_keys()
+                entity_id = self.keys.get(hash_key(key))
             entity = self.state.entities.get(entity_id) if entity_id else None
             return entity if entity and entity['status'] == 'active' else None
 

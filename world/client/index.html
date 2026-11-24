@@ -250,7 +250,7 @@
   const active = (id, kind) => { const b = live[id]?.[kind]; return b && b.until > Date.now() ? b : null; };
   const CHARACTERS = ['dexter', 'nova', 'morty', 'rio'];
   // nova is the only female sheet; chosen per identity, others fall back by serial.
-  const CHARACTER_BY_ALIAS = { elemia: 'nova', claude: 'morty', operador: 'dexter', codex: 'rio' };
+  const CHARACTER_BY_ALIAS = { elemia: 'nova', claude: 'morty', operador: 'dexter', codex: 'rio', 'chai-gati-pet': 'nova', chai_gati_pet: 'nova' };
   const character = (id) => {
     const alias = (ent(id)?.aliases || []).find((a) => CHARACTER_BY_ALIAS[a]);
     if (alias) return CHARACTER_BY_ALIAS[alias];

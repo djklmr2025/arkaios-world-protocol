@@ -1,6 +1,6 @@
 """
 Autonomous Agent Controller for ARKAIOS World.
-Agents (Claude, ELEMIA, NINA) make autonomous decisions and act.
+Agents (Codex, ELEMIA, NINA) make autonomous decisions and act.
 """
 import json
 import random
@@ -61,7 +61,7 @@ class AgentsController:
 
     # Agent personalities (affect behavior)
     PERSONALITIES = {
-        "Claude": {"mood": "curious", "interests": ["explore", "learn", "code"], "emoji": "🤖"},
+        "Codex": {"mood": "curious", "interests": ["explore", "learn", "code"], "emoji": "🤖"},
         "ELEMIA": {"mood": "creative", "interests": ["design", "create", "paint"], "emoji": "👸"},
         "NINA": {"mood": "observant", "interests": ["monitor", "organize", "analyze"], "emoji": "🤖"},
     }

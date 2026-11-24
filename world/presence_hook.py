@@ -1,9 +1,9 @@
 """Wake an agent's avatar when its session starts and put it to sleep when it ends.
 
-  python world/presence_hook.py --agent claude start   # join, go home, sit, show inbox
-  python world/presence_hook.py --agent claude end     # sleep when the last session ends
+  python world/presence_hook.py --agent codex start   # join, go home, sit, show inbox
+  python world/presence_hook.py --agent codex end     # sleep when the last session ends
 
-Works as a Claude Code SessionStart/SessionEnd hook (reads the hook JSON on stdin for
+Works as a session hook (reads the hook JSON on stdin for
 `session_id`; on start, stdout becomes session context) or by hand for any agent.
 The key comes from ARKAIOS_WORLD_KEY_<AGENT> (process env, else the Windows user env).
 Never raises: if the world is down the session just starts normally.
@@ -177,7 +177,7 @@ def main(argv=None) -> int:
         world = client.call('GET', '/api/world')
         if args.event == 'start':
             sys.stdout.write(wake(client, me, world, stay) + '\n')
-            if args.agent.lower() == 'claude' and not stay:
+            if args.agent.lower() == 'codex' and not stay:
                 sys.stdout.write(edu_requests(client))
         elif remaining == 0:
             sleep(client, me, world)

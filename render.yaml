@@ -15,3 +15,7 @@ services:
         value: "1"
       - key: GOOGLE_CLIENT_ID
         value: 502663599735-e4p66giu79jpjiofi570loibdimuiqtm.apps.googleusercontent.com
+      - key: ARKAIOS_PUBLIC_FEEDBACK
+        value: "1"
+      - key: ARKAIOS_VISITOR_SESSION_SECRET
+        generateValue: true
