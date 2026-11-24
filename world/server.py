@@ -291,24 +291,26 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
                 return self._error(HTTPStatus.BAD_REQUEST, 'chat_error', str(e))
 
         def _handle_public_feedback(self):
-            # Keep the public feedback surface local by default.  A deployment must
-            # consciously opt in instead of accidentally becoming a spam endpoint.
-            if allow_external and os.environ.get('ARKAIOS_PUBLIC_FEEDBACK', '0') != '1':
-                return self._error(HTTPStatus.FORBIDDEN, 'feedback_disabled',
-                                   'public feedback is not enabled for this deployment')
-            if not feedback_limiter.allow(self.client_address[0]):
-                return self._error(HTTPStatus.TOO_MANY_REQUESTS, 'rate_limited',
-                                   'try again in a minute')
             length = int(self.headers.get('Content-Length') or 0)
             if not 0 < length <= MAX_BODY:
                 return self._error(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, 'bad_body', 'body too large')
             try:
-                visitor = self._visitor_auth()
-                if visitor is None:
-                    return
+                # Always consume the request body before returning an error.  The
+                # HTTP/1.1 connection can otherwise misparse it as a new request.
                 data = json.loads(self.rfile.read(length))
                 if not isinstance(data, dict):
                     raise ValueError('invalid_payload')
+                # Keep the public feedback surface local by default.  A deployment
+                # must consciously opt in instead of becoming a spam endpoint.
+                if allow_external and os.environ.get('ARKAIOS_PUBLIC_FEEDBACK', '0') != '1':
+                    return self._error(HTTPStatus.FORBIDDEN, 'feedback_disabled',
+                                       'public feedback is not enabled for this deployment')
+                if not feedback_limiter.allow(self.client_address[0]):
+                    return self._error(HTTPStatus.TOO_MANY_REQUESTS, 'rate_limited',
+                                       'try again in a minute')
+                visitor = self._visitor_auth()
+                if visitor is None:
+                    return
                 from feedback_system import create_feedback
                 record = create_feedback(visitor['name'], data.get('category'), data.get('message'))
                 self._send_json(HTTPStatus.CREATED, {'ok': True, 'feedback': record})
