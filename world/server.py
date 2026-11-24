@@ -302,7 +302,8 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
                     raise ValueError('invalid_payload')
                 # Keep the public feedback surface local by default.  A deployment
                 # must consciously opt in instead of becoming a spam endpoint.
-                if allow_external and os.environ.get('ARKAIOS_PUBLIC_FEEDBACK', '0') != '1':
+                feedback_default = '1' if os.environ.get('ENVIRONMENT', '').lower() == 'production' else '0'
+                if allow_external and os.environ.get('ARKAIOS_PUBLIC_FEEDBACK', feedback_default) != '1':
                     return self._error(HTTPStatus.FORBIDDEN, 'feedback_disabled',
                                        'public feedback is not enabled for this deployment')
                 if not feedback_limiter.allow(self.client_address[0]):
