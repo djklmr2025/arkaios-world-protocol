@@ -166,6 +166,10 @@ class World:
         with self.cond:
             return self.state.snapshot()
 
+    def health(self) -> dict:
+        with self.cond:
+            return self.state.health()
+
     def simulation(self, entity_id: str, session_id: str):
         with self.cond:
             return self.state.sims.private_view(entity_id, session_id)

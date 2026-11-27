@@ -301,6 +301,7 @@
     <strong>ISLA ARKAIOS</strong>
     <span id="online-count">0 en línea</span>
   </div>
+  <div class="pill" id="legacy-houses" title="Casas y linajes registrados por el World">🏛️ Legados: cargando…</div>
   <a class="btn" href="/character-creator">🧙 Crear Personaje</a>
   <button class="btn active" id="btn-portraits">🎭 Retratos</button>
   <button class="btn" id="btn-banner">✨ Equipo</button>
@@ -608,6 +609,8 @@
   }
 
   function syncActors() {
+    const houses = (worldData.houses || []).map(h => h.name).join(' · ');
+    document.getElementById('legacy-houses').textContent = houses ? `🏛️ ${houses}` : '🏛️ Legados: sin registro';
     const entityMap = new Map((worldData.entities || []).map(e => [e.id, e]));
     const presentIds = new Set(Object.keys(worldData.presence || {}));
 

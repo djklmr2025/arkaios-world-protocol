@@ -8,6 +8,7 @@ import re
 
 import governance as gov_rules
 import homes as home_rules
+import legacy
 import mail as mail_rules
 import movement
 import simulation as sim_rules
@@ -27,6 +28,7 @@ HISTORY_PER_ROOM = 30
 ALIAS_RE = re.compile(r'^[a-z0-9][a-z0-9_-]{0,31}$')
 CAPABILITY_RE = re.compile(r'^[a-z0-9_]{1,40}$')
 REGISTRY_RE = re.compile(r'^[a-z0-9-]{1,40}$')
+LEGACY_REF_RE = re.compile(r'^[a-z0-9][a-z0-9_:/.-]{0,199}$')
 
 
 class Rejected(Exception):
@@ -89,10 +91,32 @@ class WorldState:
     def inbox(self, entity_id, since=0):
         return self.mail.view(entity_id, since)
 
+    def health(self):
+        """Small public coordination status, without history or identity details."""
+        occupied_rooms = {presence['room'] for presence in self.presence.values() if presence.get('room')}
+        return {
+            'ok': True,
+            'service': 'arkaios-world',
+            'world': {'id': self.definition['id'], 'seq': self.seq},
+            'residents': {
+                'active': sum(1 for entity in self.entities.values()
+                              if entity.get('status') == 'active'),
+                'present': len(self.presence),
+            },
+            'rooms': {'occupied': len(occupied_rooms)},
+            'work': {
+                'open_tasks': sum(1 for task in self.board.tasks.values()
+                                  if task.get('status') in task_board.OPEN_STATES),
+                'open_proposals': sum(1 for proposal in self.council.proposals.values()
+                                      if proposal.get('status') == 'open'),
+            },
+        }
+
     def snapshot(self):
         return {
             'seq': self.seq,
             'world': {k: self.definition[k] for k in ('id', 'name', 'spawn', 'districts')},
+            'houses': legacy.public_houses(),
             'entities': list(self.entities.values()),
             'presence': {eid: dict(p) for eid, p in self.presence.items()},
             'history': {rid: list(msgs) for rid, msgs in self.history.items()},
@@ -112,6 +136,9 @@ class WorldState:
         trust = spec.get('trust_level', 'sandboxed')
         aliases = list(dict.fromkeys(spec.get('aliases', [])))
         capabilities = list(dict.fromkeys(spec.get('capabilities', [])))
+        house_id = str(spec.get('house_id', '')).strip()
+        lineage_root = str(spec.get('lineage_root', '')).strip()
+        recovery_refs = list(dict.fromkeys(spec.get('recovery_refs', [])))
         if etype not in ENTITY_TYPES:
             raise Rejected('bad_type', 'type must be agent or human')
         if not 1 <= len(name) <= 40:
@@ -127,12 +154,21 @@ class WorldState:
             raise Rejected('alias_taken', 'alias already registered: ' + ', '.join(taken))
         if len(capabilities) > 16 or not all(CAPABILITY_RE.match(c) for c in capabilities):
             raise Rejected('bad_capability', 'capabilities: up to 16, [a-z0-9_]')
+        if house_id and house_id not in legacy.HOUSES:
+            raise Rejected('bad_house', 'unknown house')
+        if lineage_root and lineage_root not in self.entities:
+            raise Rejected('bad_lineage_root', 'lineage root must be an existing identity')
+        if len(recovery_refs) > 4 or not all(isinstance(ref, str) and LEGACY_REF_RE.match(ref) for ref in recovery_refs):
+            raise Rejected('bad_recovery_ref', 'recovery_refs: up to 4 safe references')
         identity = {
             'id': f'ark:{self.registry_id}:{self.next_serial}',
             'type': etype, 'display_name': name, 'aliases': aliases, 'owner': owner,
             'provider': str(spec.get('provider', ''))[:40],
             'capabilities': capabilities, 'trust_level': trust,
             'memory_ref': str(spec.get('memory_ref', ''))[:200],
+            'house_id': house_id, 'lineage_root': lineage_root,
+            'legacy_version': str(spec.get('legacy_version', ''))[:40],
+            'recovery_refs': recovery_refs,
             'status': 'active', 'created_at': now,
         }
         return [('identity.registered', 'registry', identity['id'], identity)]

@@ -157,6 +157,8 @@ def make_handler(world: World, port: int, agents_controller: AgentsController = 
                 return self._serve_asset(m.group(1), m.group(2))
             if url.path == '/api/version':
                 return self._send_json(HTTPStatus.OK, {'ok': True, 'version': client_version()})
+            if url.path == '/api/health':
+                return self._send_json(HTTPStatus.OK, world.health())
             if url.path == '/api/world':
                 return self._send_json(HTTPStatus.OK, {'ok': True, **world.snapshot()})
             if url.path == '/api/debug/agents':
@@ -483,6 +485,10 @@ def main(argv=None) -> int:
             p.add_argument('--provider', default='')
             p.add_argument('--capability', action='append', default=[])
             p.add_argument('--memory-ref', default='')
+            p.add_argument('--house', default='')
+            p.add_argument('--lineage-root', default='')
+            p.add_argument('--legacy-version', default='')
+            p.add_argument('--recovery-ref', action='append', default=[])
         if name == 'revoke':
             p.add_argument('--id', required=True)
             p.add_argument('--reason', required=True)
@@ -517,7 +523,9 @@ def main(argv=None) -> int:
             entity, key = world.register({
                 'type': args.type, 'display_name': args.name, 'owner': args.owner,
                 'aliases': args.alias, 'trust_level': args.trust, 'provider': args.provider,
-                'capabilities': args.capability, 'memory_ref': args.memory_ref})
+                'capabilities': args.capability, 'memory_ref': args.memory_ref,
+                'house_id': args.house, 'lineage_root': args.lineage_root,
+                'legacy_version': args.legacy_version, 'recovery_refs': args.recovery_ref})
             json.dump({'entity': entity, 'key': key,
                        'note': 'Key shown once. Store it in an environment variable.'},
                       sys.stdout, ensure_ascii=False, indent=1)

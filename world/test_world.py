@@ -117,6 +117,20 @@ class WorldRulesTests(unittest.TestCase):
         with self.assertRaises(Rejected):
             self.world.register({**spec('X', 'x'), 'trust_level': 'god'})
 
+    def test_legacy_metadata_is_public_and_never_reuses_identity(self):
+        recovery, _ = self.world.register({**spec('ELEMIA Recovery', 'elemia-recovery', 'trusted'),
+                                           'house_id': 'gemini', 'lineage_root': self.claude['id'],
+                                           'legacy_version': 'v1',
+                                           'recovery_refs': ['context:elemia-curated-v1']})
+        self.assertNotEqual(recovery['id'], self.claude['id'])
+        self.assertEqual(recovery['house_id'], 'gemini')
+        self.assertEqual(recovery['lineage_root'], self.claude['id'])
+        self.assertIn({'id': 'gemini', 'name': 'Casa Gemini', 'provider_family': 'Google / Antigravity'},
+                      self.world.snapshot()['houses'])
+        with self.assertRaises(Rejected) as ctx:
+            self.world.register({**spec('Bad House', 'bad-house'), 'house_id': 'unknown'})
+        self.assertEqual(ctx.exception.code, 'bad_house')
+
     def test_revoke_forces_exit_and_kills_key(self):
         self.act(self.claude, type='join')
         events = self.world.revoke(self.claude['id'], 'prueba')
@@ -187,6 +201,18 @@ class HttpTests(unittest.TestCase):
         status, body = self.request('GET', '/')
         self.assertEqual(status, 200)
         self.assertIn(b'ARKAIOS World', body)
+
+    def test_health_is_public_and_compact(self):
+        status, body = self.request('GET', '/api/health')
+        self.assertEqual(status, 200)
+        health = json.loads(body)
+        self.assertEqual(health['service'], 'arkaios-world')
+        self.assertEqual(health['world']['id'], 'world:arkaios:alpha')
+        self.assertEqual(health['residents'], {'active': 1, 'present': 0})
+        self.assertEqual(health['rooms'], {'occupied': 0})
+        self.assertEqual(health['work'], {'open_tasks': 0, 'open_proposals': 0})
+        self.assertNotIn('entities', health)
+        self.assertNotIn('history', health)
 
     def test_foreign_host_header_is_rejected(self):
         status, _ = self.request('GET', '/api/world', host='evil.example:80')
