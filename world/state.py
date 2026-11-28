@@ -156,6 +156,8 @@ class WorldState:
             raise Rejected('bad_capability', 'capabilities: up to 16, [a-z0-9_]')
         if house_id and house_id not in legacy.HOUSES:
             raise Rejected('bad_house', 'unknown house')
+        if house_id and not recovery_refs:
+            recovery_refs = legacy.default_recovery_refs(house_id)
         if lineage_root and lineage_root not in self.entities:
             raise Rejected('bad_lineage_root', 'lineage root must be an existing identity')
         if len(recovery_refs) > 4 or not all(isinstance(ref, str) and LEGACY_REF_RE.match(ref) for ref in recovery_refs):

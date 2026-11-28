@@ -125,8 +125,13 @@ class WorldRulesTests(unittest.TestCase):
         self.assertNotEqual(recovery['id'], self.claude['id'])
         self.assertEqual(recovery['house_id'], 'gemini')
         self.assertEqual(recovery['lineage_root'], self.claude['id'])
-        self.assertIn({'id': 'gemini', 'name': 'Casa Gemini', 'provider_family': 'Google / Antigravity'},
-                      self.world.snapshot()['houses'])
+        house = next(h for h in self.world.snapshot()['houses'] if h['id'] == 'gemini')
+        self.assertEqual(house['name'], 'Casa Gemini')
+        self.assertEqual(house['recovery_ref'], 'context:house:gemini-v1')
+        self.assertEqual(recovery['recovery_refs'], ['context:elemia-curated-v1'])
+        default_recovery, _ = self.world.register({**spec('Gemini Recovery', 'gemini-recovery', 'trusted'),
+                                                   'house_id': 'gemini'})
+        self.assertEqual(default_recovery['recovery_refs'], ['context:house:gemini-v1'])
         with self.assertRaises(Rejected) as ctx:
             self.world.register({**spec('Bad House', 'bad-house'), 'house_id': 'unknown'})
         self.assertEqual(ctx.exception.code, 'bad_house')
